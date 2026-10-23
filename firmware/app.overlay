@@ -1,0 +1,10 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/ {
+	gamepad: gamepad {
+		compatible = "zephyr,hid-device";
+		label = "PuckOff Gamepad";
+		protocol-code = "none";
+		in-report-size = <16>;
+		in-polling-period-us = <1000>;
+	};
+};
