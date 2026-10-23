@@ -1,0 +1,1 @@
+PUCKOFF/1 {"id":"0123456789abcdef","op":"info","ok":true,"protocol":1,"product":"PuckOff Receiver","firmware":"dev","slots":4,"record_bytes":24,"capabilities":["status","export","import","clear"],"native_pairing":false}
