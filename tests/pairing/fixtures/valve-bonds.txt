@@ -1,0 +1,14 @@
+bonds -h
+ibex0_proteus_uuid : 0x11223344
+ibex0_ibex_uuid : 0x55667788
+ibex0_peer_sn : SYNTHETIC-A
+ibex1_proteus_uuid : 0x0A1B2C3D
+ibex1_ibex_uuid : 0x40516273
+ibex1_peer_sn : SYNTHETIC-B
+ibex2_proteus_uuid : 0x00000000
+ibex2_ibex_uuid : 0x00000000
+ibex2_peer_sn :
+ibex3_proteus_uuid : 0x00000000
+ibex3_ibex_uuid : 0x00000000
+ibex3_peer_sn :
+dongle~$

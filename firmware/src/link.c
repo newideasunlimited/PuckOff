@@ -211,11 +211,12 @@ static bool poll_once(int slot, uint32_t now_ms)
 static void refresh_sessions(void)
 {
 	for (int i = 0; i < BOND_SLOTS; i++) {
-		const struct bond *b = bond_get(i);
+		struct bond b;
 
-		if (b->used && slots[i].controller_id != b->controller_id) {
-			derive_session(i, b, &slots[i].session);
-			slots[i].controller_id = b->controller_id;
+		bond_snapshot(i, &b);
+		if (b.used && slots[i].controller_id != b.controller_id) {
+			derive_session(i, &b, &slots[i].session);
+			slots[i].controller_id = b.controller_id;
 		}
 	}
 }
@@ -260,10 +261,11 @@ static void link_thread(void *a, void *b, void *c)
 				next_poll_us = radio_now_us() + POLL_PERIOD_US;
 			}
 			for (int i = 0; i < BOND_SLOTS; i++) {
-				const struct bond *bd = bond_get(i);
+				struct bond bd;
 				struct slot_state *s = &slots[i];
 
-				if (!bd->used || (int32_t)(now_ms - s->backoff_until_ms) < 0) {
+				bond_snapshot(i, &bd);
+				if (!bd.used || (int32_t)(now_ms - s->backoff_until_ms) < 0) {
 					continue;
 				}
 				/* Don't spend airtime polling an absent controller at full rate. */
@@ -286,20 +288,22 @@ static void link_thread(void *a, void *b, void *c)
 		if (!any_up || now_ms - last_beacon_ms >= SESSION_BEACON_PERIOD_MS) {
 			last_beacon_ms = now_ms;
 			for (int i = 0; i < BOND_SLOTS; i++) {
-				const struct bond *bd = bond_get(i);
+				struct bond bd;
 
-				if (bd->used && (int32_t)(now_ms - slots[i].backoff_until_ms) >= 0) {
-					advertise(i, bd, true);
+				bond_snapshot(i, &bd);
+				if (bd.used && (int32_t)(now_ms - slots[i].backoff_until_ms) >= 0) {
+					advertise(i, &bd, true);
 				}
 			}
 		}
 		if (!any_up || now_ms - last_adv_ms >= ADVERTISE_PERIOD_CONNECTED_MS) {
 			last_adv_ms = now_ms;
 			for (int i = 0; i < BOND_SLOTS; i++) {
-				const struct bond *bd = bond_get(i);
+				struct bond bd;
 
-				if (bd->used && (int32_t)(now_ms - slots[i].backoff_until_ms) >= 0) {
-					advertise(i, bd, false);
+				bond_snapshot(i, &bd);
+				if (bd.used && (int32_t)(now_ms - slots[i].backoff_until_ms) >= 0) {
+					advertise(i, &bd, false);
 				}
 			}
 		}

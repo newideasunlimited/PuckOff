@@ -15,7 +15,7 @@ Plug the board in, pair your controller, play.
 | Xbox / PlayStation / Switch style modes    | Planned      |
 | Steam receiver mode (pairing from Steam)  | Planned      |
 | Bluetooth to TVs, phones, Apple TV        | Planned      |
-| Move a controller between many boards     | Planned      |
+| Copy a pairing to any number of boards    | Host-assisted setup |
 
 ## Hardware
 
@@ -30,15 +30,28 @@ bootloader (SoftDevice S140 6.x layout).
 
 Later updates: type `bootloader` in the serial console instead of using a paperclip.
 
-## Pairing (for now)
+## Pairing and setup
 
-Open the board's serial port (115200 baud, any terminal) and enter your
-controller's pairing record:
+Use the local [setup tool](docs/pairing.md) to copy a pairing from an official
+2026 Steam Controller Puck, another PuckOff, or a private backup. No controller
+IDs to type, no browser WebSerial requirement, and no limit on the number of
+DIY receivers you can set up.
 
-    pair set 0 <receiver-id> <controller-id> <serial>
-    status
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install -r tools/requirements.txt
+    python tools/puckoff_setup.py devices
 
-Pairing from Steam is planned and will replace this step.
+Every connection requires an explicitly selected port. Imports default to a
+dry run; `--apply` enables writing, and occupied slots need explicit replacement
+permission plus a private backup. The official puck is read-only and is never
+reset or erased. Flash firmware containing the setup commands before using the
+tool with a PuckOff board.
+
+See [pairing instructions](docs/pairing.md) for the complete workflow and
+[management protocol v1](docs/management.md) for app integration. The original
+serial commands remain available for recovery. Native over-air pairing and
+pairing directly from Steam are not implemented yet.
 
 ## Build from source
 

@@ -82,7 +82,10 @@ int main(void)
 		bool paired = false;
 
 		for (int i = 0; i < BOND_SLOTS; i++) {
-			paired |= bond_get(i)->used;
+			struct bond b;
+
+			bond_snapshot(i, &b);
+			paired |= b.used;
 		}
 		if (link_any_connected()) {
 			gpio_pin_set_dt(&led, 1);
