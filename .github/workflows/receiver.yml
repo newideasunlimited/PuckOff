@@ -1,0 +1,98 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Receiver
+
+on:
+  pull_request:
+    paths:
+      - "firmware/**"
+      - "tests/receiver/**"
+      - "ci/**"
+      - "west.yml"
+      - ".github/workflows/receiver.yml"
+  push:
+    branches: [main]
+    paths:
+      - "firmware/**"
+      - "tests/receiver/**"
+      - "ci/**"
+      - "west.yml"
+      - ".github/workflows/receiver.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: receiver-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Host regression suite
+        env:
+          CC: clang
+          UBSAN_OPTIONS: halt_on_error=1
+        run: |
+          cmake -S tests/receiver -B build/receiver-tests -G Ninja
+          cmake --build build/receiver-tests
+          ctest --test-dir build/receiver-tests --output-on-failure
+          python3 -m unittest discover -s ci -p 'test_*.py'
+
+  uf2:
+    needs: host-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ZEPHYR_TOOLCHAIN_VARIANT: zephyr
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: puckoff
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12.12"
+      - name: Install pinned build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes --no-install-recommends device-tree-compiler gperf
+          python -m pip install --disable-pip-version-check -r puckoff/ci/requirements.txt
+          bash puckoff/ci/install-toolchain.sh "$RUNNER_TEMP/puckoff-toolchain"
+      - name: Initialize locked SDK workspace
+        run: |
+          west init -l puckoff
+          west update --narrow -o=--depth=1
+      - name: Build twice and compare UF2
+        env:
+          ZEPHYR_SDK_INSTALL_DIR: ${{ runner.temp }}/puckoff-toolchain/zephyr-sdk-1.0.1
+        run: |
+          export SOURCE_DATE_EPOCH="$(git -C puckoff show -s --format=%ct HEAD)"
+          west build --sysbuild -b promicro_nrf52840/nrf52840/uf2 \
+            -d build/receiver puckoff/firmware
+          west build --sysbuild -b promicro_nrf52840/nrf52840/uf2 \
+            -d build/repro puckoff/firmware
+          cmp build/receiver/firmware/zephyr/zephyr.uf2 build/repro/firmware/zephyr/zephyr.uf2
+          python puckoff/ci/check_uf2.py build/receiver/firmware/zephyr/zephyr.uf2
+          mkdir artifacts
+          cp build/receiver/firmware/zephyr/zephyr.uf2 artifacts/puckoff.uf2
+          cp build/receiver/firmware/zephyr/zephyr.elf artifacts/puckoff.elf
+          cp build/receiver/firmware/zephyr/.config artifacts/firmware.config
+          west manifest --freeze > artifacts/west-lock.yml
+          {
+            git -C puckoff rev-parse HEAD
+            echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+            west --version
+            cmake --version
+            "$ZEPHYR_SDK_INSTALL_DIR/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc" --version
+            python -m pip freeze
+          } > artifacts/BUILD-INFO.txt
+          (cd artifacts && sha256sum puckoff.uf2 > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: puckoff-nrf52840-uf2-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14

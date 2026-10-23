@@ -1,17 +1,20 @@
 # PuckOff
 
-Open firmware that turns a $5 nRF52840 board into a wireless receiver for the
-Steam Controller (2026), so it works on anything with a USB port.
+Open prototype firmware that turns a nice!nano-compatible nRF52840 board into
+a wireless receiver for the Steam Controller (2026), exposing one generic USB
+HID gamepad.
 
-Plug the board in, pair your controller, play.
+Baseline hardware checks cover one controller on macOS/Brave. Other hosts,
+boards, consoles and the current reliability changes need hardware validation;
+a USB port alone does not imply compatibility.
 
 ## Status
 
 | Feature                                   | State        |
 |-------------------------------------------|--------------|
-| Controller link (2.4 GHz, 250 Hz)         | Working      |
-| Standard USB gamepad (PC, Mac, Linux, Android, browsers) | Working |
-| Up to 4 controllers per board (radio)     | In progress  |
+| Controller link (2.4 GHz, 250 Hz target)  | Baseline demonstrated on one controller |
+| Generic USB gamepad                     | Baseline demonstrated on macOS/Brave |
+| Four stored bonds, one active controller | Implemented; not four simultaneous gamepads |
 | Xbox / PlayStation / Switch style modes    | Planned      |
 | Steam receiver mode (pairing from Steam)  | Planned      |
 | Bluetooth to TVs, phones, Apple TV        | Planned      |
@@ -19,14 +22,19 @@ Plug the board in, pair your controller, play.
 
 ## Hardware
 
-Any nRF52840 "Pro Micro" / nice!nano-compatible board with the Adafruit UF2
-bootloader (SoftDevice S140 6.x layout).
+Build target: `promicro_nrf52840/nrf52840/uf2`, using an Adafruit UF2
+bootloader with the SoftDevice S140 6.x memory layout. Check your particular
+board and bootloader before flashing; not every nRF52840 board is interchangeable.
 
 ## Install
 
 1. Double-tap the board's **RST** pin to **GND** with a paperclip. A drive called
    `NICENANO` appears.
-2. Copy `puckoff.uf2` onto it. The board reboots as **PuckOff Receiver**.
+2. Copy a matching `puckoff.uf2` onto it. The board reboots as **PuckOff Receiver**.
+
+The **Receiver** GitHub Actions workflow produces a commit-specific UF2
+artifact, not a release. Unzip it before copying the firmware, and confirm the
+board/bootloader layout above.
 
 Later updates: type `bootloader` in the serial console instead of using a paperclip.
 
@@ -42,11 +50,16 @@ Pairing from Steam is planned and will replace this step.
 
 ## Build from source
 
-Requires the nRF Connect SDK v3.4 (Zephyr 4.4).
+The default build locks nRF Connect SDK **v3.4.1** sources and Zephyr SDK
+**1.0.1**. See [build and CI instructions](docs/build.md) for a fresh workspace
+and [receiver reliability](docs/receiver.md) for host tests and hardware checks.
 
-    west build -b promicro_nrf52840/nrf52840/uf2 firmware
+From an existing matching SDK workspace:
 
-The output is `build/firmware/zephyr/zephyr.uf2`.
+    west build --sysbuild -b promicro_nrf52840/nrf52840/uf2 \
+      -d /path/to/PuckOff/build/receiver /path/to/PuckOff/firmware
+
+The output is `build/receiver/firmware/zephyr/zephyr.uf2` in that checkout.
 
 ## License
 
