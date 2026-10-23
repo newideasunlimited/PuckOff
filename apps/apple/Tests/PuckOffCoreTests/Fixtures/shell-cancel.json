@@ -1,0 +1,6 @@
+{
+  "request": [21],
+  "response": [27, 91, 74],
+  "firmware": "v0.1.0",
+  "provenance": "Coordinator measurement on 2026-10-22: Ctrl-U only, no CR. No hardware was accessed by the Apple-app worker."
+}
