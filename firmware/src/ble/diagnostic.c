@@ -9,6 +9,8 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/shell/shell.h>
+#include <zephyr/sys/reboot.h>
+#include <nrfx.h>
 
 LOG_MODULE_REGISTER(ble_diagnostic, LOG_LEVEL_INF);
 
@@ -94,6 +96,18 @@ SHELL_STATIC_SUBCMD_SET_CREATE(ble_commands,
 	SHELL_SUBCMD_SET_END
 );
 SHELL_CMD_REGISTER(ble, &ble_commands, "BLE-only diagnostic; no controller RF", NULL);
+
+static int command_bootloader(const struct shell *shell, size_t argc, char **argv)
+{
+	ARG_UNUSED(shell);
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+	/* Preserve the default image's Adafruit UF2 software recovery path. */
+	NRF_POWER->GPREGRET = 0x57;
+	sys_reboot(SYS_REBOOT_COLD);
+	return 0;
+}
+SHELL_CMD_REGISTER(bootloader, NULL, "Reboot into the UF2 drive", command_bootloader);
 
 int main(void)
 {

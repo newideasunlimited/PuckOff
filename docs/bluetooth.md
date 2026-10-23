@@ -66,6 +66,7 @@ ble status
 ble buttons 0001
 ble neutral
 ble forget_host
+bootloader
 ```
 
 `buttons` is explicitly **manual test input**, not a controller decoder or a
@@ -73,6 +74,11 @@ background generator. It sets a hexadecimal 16-bit mask with neutral axes; use
 `neutral` to release it. `forget_host` requires the host to be disconnected,
 removes only the `bt` host bond, and does not erase proprietary controller
 pairing records. The host may also need to forget its cached bond.
+
+`bootloader` preserves the default image's software UF2 reentry: write `0x57`
+to `NRF_POWER->GPREGRET`, then cold-reboot. Keep a data-capable USB connection
+available when using this command for unattended recovery. It is not a BLE
+remote-update service.
 
 Test preparation requires an nRF52840 board with the named UF2 layout, a stable
 USB power source, and a BLE central able to inspect encrypted GATT/HID traffic.
