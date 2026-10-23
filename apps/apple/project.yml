@@ -1,0 +1,63 @@
+name: PuckOff
+options:
+  minimumXcodeGenVersion: 2.44.0
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "14.0"
+    iOS: "17.0"
+packages:
+  PuckOffKit:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    CODE_SIGNING_ALLOWED: NO
+    GENERATE_INFOPLIST_FILE: YES
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: "0.1.0"
+    INFOPLIST_KEY_CFBundleDisplayName: PuckOff
+    INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+targets:
+  PuckOffMac:
+    type: application
+    platform: macOS
+    sources:
+      - App
+    dependencies:
+      - package: PuckOffKit
+        product: PuckOffCore
+      - package: PuckOffKit
+        product: PuckOffPlatform
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.newideasunlimited.puckoff.mac
+        ENABLE_APP_SANDBOX: NO
+  PuckOffiOS:
+    type: application
+    platform: iOS
+    sources:
+      - App
+    dependencies:
+      - package: PuckOffKit
+        product: PuckOffCore
+      - package: PuckOffKit
+        product: PuckOffPlatform
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.newideasunlimited.puckoff.ios
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+schemes:
+  PuckOffMac:
+    build:
+      targets:
+        PuckOffMac: all
+  PuckOffiOS:
+    build:
+      targets:
+        PuckOffiOS: all
