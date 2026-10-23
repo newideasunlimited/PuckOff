@@ -120,3 +120,10 @@ claims. See [receiver reliability](receiver.md) for the test boundary.
 | 40–45 | 3×2 | gyroscope |
 
 Button bits are listed in `firmware/src/input.h`.
+
+## USB reports
+
+The USB-facing formats are separate from these radio packets. See
+[USB modes](usb-modes.md) for the generic and opt-in wired Switch report layouts,
+public protocol sources, and host/game compatibility limits. Changing USB mode
+does not change the radio pairing format.

@@ -19,8 +19,9 @@ if(CONFIG_PUCKOFF_TRANSPORT_USB_RAW_RF)
 		src/bond.c
 		src/input.c
 		src/usb.c
-		src/console.c
 	)
+	target_sources_ifdef(CONFIG_PUCKOFF_USB_SWITCH app PRIVATE src/usb_switch.c)
+	target_sources_ifdef(CONFIG_SHELL app PRIVATE src/console.c)
 elseif(CONFIG_PUCKOFF_TRANSPORT_BLE_DIAGNOSTIC)
 	if(NOT CONFIG_BT_LL_SOFTDEVICE)
 		message(FATAL_ERROR "The BLE diagnostic requires the Nordic SoftDevice Controller.")

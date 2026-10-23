@@ -1,0 +1,22 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+&gamepad {
+	label = "PuckOff Wired Gamepad";
+	in-report-size = <64>;
+	in-polling-period-us = <5000>;
+	out-report-size = <64>;
+	out-polling-period-us = <5000>;
+};
+
+&board_cdc_acm_uart {
+	status = "disabled";
+};
+
+/ {
+	chosen {
+		/delete-property/ zephyr,console;
+		/delete-property/ zephyr,shell-uart;
+		/delete-property/ zephyr,uart-mcumgr;
+		/delete-property/ zephyr,bt-mon-uart;
+		/delete-property/ zephyr,bt-c2h-uart;
+	};
+};

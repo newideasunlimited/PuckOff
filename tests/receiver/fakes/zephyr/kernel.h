@@ -5,9 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdatomic.h>
+#include <zephyr/toolchain.h>
 
-#define __aligned(n) __attribute__((aligned(n)))
-#define __packed __attribute__((packed))
 #define ARG_UNUSED(x) (void)(x)
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define K_NO_WAIT 0

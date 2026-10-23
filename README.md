@@ -1,21 +1,27 @@
 # PuckOff
 
 Open prototype firmware that turns a nice!nano-compatible nRF52840 board into
-a wireless receiver for the Steam Controller (2026), exposing one generic USB
-HID gamepad.
+a wireless receiver for the Steam Controller (2026), exposing one USB HID
+gamepad.
 
 Baseline hardware checks cover one controller on macOS/Brave. Other hosts,
 boards, consoles and the current reliability changes need hardware validation;
 a USB port alone does not imply compatibility.
+
+The current USB identities are for development, not shipping products. Generic
+mode uses the **private-test-only, non-unique `1209:0001` PID**, which must not be
+used on redistributed, sold, or manufactured devices. See
+[USB modes and compatibility](docs/usb-modes.md) before choosing an image.
 
 ## Status
 
 | Feature                                   | State        |
 |-------------------------------------------|--------------|
 | Controller link (2.4 GHz, 250 Hz target)  | Baseline demonstrated on one controller |
-| Generic USB gamepad                     | Baseline demonstrated on macOS/Brave |
+| Generic USB HID gamepad                  | macOS HIDAPI and Brave input confirmed on the baseline; other hosts/games need testing |
 | Four stored bonds, one active controller | Implemented; not four simultaneous gamepads |
-| Xbox / PlayStation / Switch style modes    | Planned      |
+| Wired Switch / Pokken-style USB HID      | Implemented, opt-in; hardware validation pending |
+| Xbox / PlayStation console support       | Not implemented; no authentication support |
 | Steam receiver mode (pairing from Steam)  | Planned      |
 | Bluetooth to TVs, phones, Apple TV        | Planned      |
 | Copy a pairing to any number of boards    | Host-assisted setup |
@@ -75,6 +81,9 @@ From an existing matching SDK workspace:
       -d /path/to/PuckOff/build/receiver /path/to/PuckOff/firmware
 
 The output is `build/receiver/firmware/zephyr/zephyr.uf2` in that checkout.
+Generic HID plus the serial console remains the default. The experimental
+wired Switch image has **no serial console**; build and recovery instructions
+are in [USB modes](docs/usb-modes.md).
 
 ## Native Apple companion apps
 

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 mainmenu "PuckOff firmware"
 
-source "Kconfig.zephyr"
 rsource "Kconfig.transport"
-orsource "Kconfig.usb"
+rsource "Kconfig.usb"
+source "Kconfig.zephyr"
