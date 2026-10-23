@@ -28,8 +28,9 @@ board and bootloader before flashing; not every nRF52840 board is interchangeabl
 
 ## Install
 
-1. Double-tap the board's **RST** pin to **GND** with a paperclip. A drive called
-   `NICENANO` appears.
+1. Double-tap the board's **RST** pin to **GND** with a paperclip. On a matching
+   bootloader, wait for the `NICENANO` drive to mount; USB re-enumeration alone
+   does not guarantee a mounted drive.
 2. Copy a matching `puckoff.uf2` onto it. The board reboots as **PuckOff Receiver**.
 
 The **Receiver** GitHub Actions workflow produces a commit-specific UF2
@@ -37,6 +38,7 @@ artifact, not a release. Unzip it before copying the firmware, and confirm the
 board/bootloader layout above.
 
 Later updates: type `bootloader` in the serial console instead of using a paperclip.
+If the drive does not mount, see the [recovery notes](docs/build.md#recovery).
 
 ## Pairing (for now)
 

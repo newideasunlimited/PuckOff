@@ -73,3 +73,31 @@ cmake --build build/receiver-tests
 ctest --test-dir build/receiver-tests --output-on-failure
 python3 -m unittest discover -s ci -p 'test_*.py'
 ```
+
+## Recovery
+
+Rebooting into the UF2 bootloader can re-enumerate USB without mounting its
+mass-storage drive on macOS. Do not assume that seeing a bootloader USB device
+means a UF2 copy can proceed.
+
+The hardware owner recovered the tested board using Adafruit **serial DFU**
+over its verified bootloader CDC port. This requires a separately validated,
+application-only Intel HEX: every data address must be inside
+`0x26000 <= address < 0xEC000`. Do not assume an arbitrary `merged.hex` or
+vendor package meets that condition. This fallback was exercised on the
+matching board/bootloader, not every nRF52840 variant.
+
+With Adafruit's `adafruit-nrfutil` installed and that validated image:
+
+```sh
+adafruit-nrfutil dfu genpkg --dev-type 0x0052 \
+  --application application-only.hex app-only.zip
+adafruit-nrfutil dfu serial --package app-only.zip \
+  --port VERIFIED_BOOTLOADER_CDC_PORT --baudrate 115200
+```
+
+The placeholder must be replaced with the positively identified bootloader
+port, not a guessed serial device. This procedure must contain **no bootloader,
+SoftDevice, UICR or settings update**. The observed application-only recovery
+preserved stored pairing; it is not a guarantee that unrelated flashing tools
+or board layouts will preserve it. CI does not run recovery or flash hardware.
