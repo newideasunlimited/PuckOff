@@ -1,0 +1,111 @@
+name: Apple companion
+
+"on":
+  pull_request:
+    paths:
+      - "apps/apple/**"
+      - ".github/workflows/apple.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/apple/**"
+      - ".github/workflows/apple.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apple-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apple:
+    name: Package tests and optional native builds
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/apple
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Report installed Apple toolchain
+        run: |
+          if [[ ! -d "$DEVELOPER_DIR" ]]; then
+            echo "::error::Preinstalled Xcode 26.2 is missing; no toolchain will be downloaded."
+            exit 1
+          fi
+          {
+            printf '%s\n' '## Apple CI toolchain' '```text'
+            xcodebuild -version
+            xcrun swift --version
+            xcodebuild -showsdks
+            printf '%s\n' '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Run fixture-only package tests
+        id: tests
+        run: xcrun swift test
+
+      - name: Check preinstalled native build tools
+        id: native
+        run: |
+          if command -v xcodegen >/dev/null 2>&1; then
+            xcodegen --version | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "xcodegen=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "xcodegen=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Native builds skipped: XcodeGen is not preinstalled. Package tests remain required."
+          fi
+          if xcrun --sdk iphoneos --show-sdk-path >/dev/null 2>&1; then
+            echo "iphoneos=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "iphoneos=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::iOS device-SDK build skipped: the SDK is not installed. No platform will be downloaded."
+          fi
+
+      - name: Generate the native project
+        if: steps.native.outputs.xcodegen == 'true'
+        run: xcodegen generate --spec project.yml
+
+      - name: Build unsigned macOS app
+        id: mac
+        if: steps.native.outputs.xcodegen == 'true'
+        run: |
+          xcodebuild -quiet -project PuckOff.xcodeproj -scheme PuckOffMac \
+            -configuration Debug -destination 'generic/platform=macOS' \
+            -derivedDataPath DerivedData/ci-mac -jobs 2 \
+            CODE_SIGNING_ALLOWED=NO build
+
+      - name: Build unsigned iOS app with installed device SDK
+        id: ios
+        if: steps.native.outputs.xcodegen == 'true' && steps.native.outputs.iphoneos == 'true'
+        run: |
+          xcodebuild -quiet -project PuckOff.xcodeproj -scheme PuckOffiOS \
+            -configuration Debug -destination 'generic/platform=iOS' \
+            -derivedDataPath DerivedData/ci-ios-device -jobs 2 \
+            CODE_SIGNING_ALLOWED=NO build
+
+      - name: Summarize actual coverage
+        if: always()
+        working-directory: .
+        env:
+          TEST_RESULT: ${{ steps.tests.outcome }}
+          MAC_RESULT: ${{ steps.mac.outcome }}
+          IOS_RESULT: ${{ steps.ios.outcome }}
+        run: |
+          {
+            printf '%s\n' '## Apple CI coverage' '| Check | Result |' '| --- | --- |'
+            printf '| Fixture-only package tests | %s |\n' "$TEST_RESULT"
+            printf '| Unsigned macOS build | %s |\n' "$MAC_RESULT"
+            printf '| Unsigned iOS device-SDK build | %s |\n' "$IOS_RESULT"
+            printf '\n%s\n' \
+              'A skipped native build is not a verified build. No signing, device access, app launch, simulator boot, or simulator download is performed.'
+          } >> "$GITHUB_STEP_SUMMARY"

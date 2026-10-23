@@ -76,6 +76,36 @@ open device files, or launch either app. If a required Apple SDK is missing,
 do not report its UI as built. Standalone non-Apple Swift toolchains can work on
 the core, but this change does not claim a Linux validation run.
 
+### Continuous integration
+
+[Apple companion CI](../../.github/workflows/apple.yml) runs for pull requests
+and `main` pushes affecting `apps/apple/**` or the workflow itself, with a manual
+dispatch option. It uses the `macos-15` hosted runner and explicitly selects its
+preinstalled **Xcode 26.2**, rather than relying on that image's older default
+Xcode. The [runner image inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md)
+lists Xcode 26.2 and macOS/iOS SDK 26.2. The job logs the actual Xcode, Swift, SDK,
+and available XcodeGen versions; it fails if the selected toolchain is absent
+instead of downloading a replacement.
+
+Package tests are mandatory. Native builds are conditional on **preinstalled
+XcodeGen**: the job generates the project from `project.yml`, builds unsigned
+macOS, and also builds unsigned iOS if the device SDK is installed. A missing
+generator or iOS SDK produces an explicit warning and a **skipped**, not
+successful, build in the job summary. Once available, generator/version errors
+and native build failures fail the job; they are not ignored.
+
+CI installs no tools, accesses no signing account or secrets, and neither boots
+nor downloads a simulator. It does not launch either app or touch hardware.
+The job has read-only repository permissions, no persisted checkout credentials,
+a 20-minute timeout, and cancellation of superseded runs.
+
+CI's selected Xcode 26.2/SDK 26.2 environment is distinct from the locally
+verified **Xcode 27.1 / Swift 6.4 / XcodeGen 2.46.0**, with macOS SDK 27.0 and
+iOS SDK 27.1. Local verification covered macOS, iOS Simulator, and iOS device-SDK
+builds. CI does **not** claim simulator or hardware validation, and its actual
+build coverage depends on the tools reported by each run. Deployment minimums
+remain macOS 14 and iOS 17.
+
 ## Management-v1 dependency
 
 Firmware at the original `76e830c` revision has only the legacy interactive
