@@ -130,11 +130,18 @@ static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 		if (!b.used) {
 			continue;
 		}
-		link_get_stats(i, &st);
+		int err = link_get_stats(i, &st);
+
+		if (err) {
+			shell_error(sh, "slot %d: status failed (%d)", i, err);
+			return err;
+		}
 		shell_print(sh,
-			    "slot %d: %s rssi -%u dBm polls %u replies %u reports %u crc-errors %u",
+			    "slot %d: %s rssi -%u dBm polls %u replies %u reports %u crc-errors %u "
+			    "invalid %u radio-errors %u deferred %u",
 			    i, st.connected ? "CONNECTED" : (st.powered_off ? "off" : "searching"),
-			    st.rssi, st.polls, st.replies, st.reports, st.crc_errors);
+			    st.rssi, st.polls, st.replies, st.reports, st.crc_errors,
+			    st.invalid_packets, st.radio_errors, st.deferred);
 	}
 	return 0;
 }
@@ -256,7 +263,11 @@ static int cmd_setup_status(const struct shell *sh, size_t argc, char **argv)
 
 		bond_snapshot(i, &b);
 		if (b.used) {
-			link_get_stats(i, &st);
+			int err = link_get_stats(i, &st);
+
+			if (err) {
+				return setup_error(sh, id, "status", err);
+			}
 		}
 		fits = append(line, sizeof(line), &pos,
 			      "%s{\"slot\":%d,\"used\":%s,\"connected\":%s,"

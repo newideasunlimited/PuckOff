@@ -3,6 +3,7 @@
 """Compile real bond/console code against in-memory settings and host locks."""
 
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -17,7 +18,7 @@ ROOT = HERE.parents[1]
 class FirmwareTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        compiler = shutil.which("cc")
+        compiler = shutil.which(os.environ.get("CC", "cc"))
         if compiler is None:
             raise RuntimeError("A host C compiler is required for pairing firmware tests.")
         cls.temporary = tempfile.TemporaryDirectory(prefix="puckoff-pairing-c-")

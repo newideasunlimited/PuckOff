@@ -17,7 +17,7 @@ static char output[8192];
 static size_t output_len;
 static uint8_t flash_records[BOND_SLOTS][BOND_RECORD_LEN];
 static bool flash_present[BOND_SLOTS];
-static int init_error, backend_load_error, save_error, writes;
+static int init_error, backend_load_error, save_error, stats_error, writes;
 static const char *bad_key;
 static size_t bad_length;
 static ssize_t short_read;
@@ -54,8 +54,11 @@ void test_shell_print(const struct shell *sh, const char *format, ...)
 	output[output_len] = '\0';
 }
 
-void link_get_stats(int slot, struct link_stats *out)
+int link_get_stats(int slot, struct link_stats *out)
 {
+	if (stats_error) {
+		return stats_error;
+	}
 	*out = (struct link_stats){
 		.connected = true,
 		.rssi = maximum_stats ? UINT8_MAX : 47,
@@ -63,7 +66,11 @@ void link_get_stats(int slot, struct link_stats *out)
 		.replies = maximum_stats ? UINT32_MAX : 995,
 		.reports = maximum_stats ? UINT32_MAX : 990,
 		.crc_errors = maximum_stats ? UINT32_MAX : 2,
+		.invalid_packets = 7,
+		.radio_errors = 8,
+		.deferred = 9,
 	};
+	return 0;
 }
 
 void link_set_verbose(bool on)
@@ -148,7 +155,7 @@ static void reset_all(void)
 	reset_runtime();
 	memset(flash_records, 0, sizeof(flash_records));
 	memset(flash_present, 0, sizeof(flash_present));
-	init_error = backend_load_error = save_error = writes = 0;
+	init_error = backend_load_error = save_error = stats_error = writes = 0;
 	inject_bad_load = false;
 	short_read = 0;
 	maximum_stats = false;
@@ -430,6 +437,17 @@ static void test_console(void)
 	assert(strstr(output, "receiver") == NULL);
 	assert(strstr(output, "controller") == NULL);
 	assert(strstr(output, "4294967295") != NULL);
+	reset_output();
+	assert(cmd_status(&test_shell, 1, status) == 0);
+	assert(strstr(output, "invalid 7 radio-errors 8 deferred 9") != NULL);
+	stats_error = -EIO;
+	reset_output();
+	assert(cmd_status(&test_shell, 1, status) == -EIO);
+	assert(strstr(output, "status failed") != NULL);
+	reset_output();
+	assert(cmd_setup_status(&test_shell, 2, status) == -EIO);
+	assert(strstr(output, "\"ok\":false,\"error\":\"storage_io\"") != NULL);
+	assert(strstr(output, "\"ok\":true") == NULL);
 }
 
 int main(int argc, char **argv)

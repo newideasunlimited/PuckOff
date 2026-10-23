@@ -207,6 +207,12 @@ framing bounds, partial/stale responses, dry runs, and failed confirmations.
 Firmware-generated info/status lines are compared byte-for-byte with the
 shared fixtures in `tests/pairing/fixtures/`.
 
+The separate **Pairing** workflow in `.github/workflows/pairing.yml` runs this
+suite for firmware, pairing-tool/dependency, fixture/test, and workflow edits.
+It uses a host C compiler and Python, with no SDK, serial dependency
+installation, or device access. It does not change the receiver/USB build
+workflow.
+
 All bond/serial fixtures are invented. `line-clear.json` is a non-sensitive
 protocol observation: the coordinator confirmed that Ctrl-U on the original
 PuckOff firmware returns exactly `ESC[J`, without a preceding CR. The official

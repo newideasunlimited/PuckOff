@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: Apache-2.0
+cmake_minimum_required(VERSION 3.20)
+project(receiver_tests C)
+enable_testing()
+find_package(Threads REQUIRED)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+option(PUCKOFF_SANITIZERS "Enable address and undefined-behavior sanitizers" ON)
+
+foreach(name input link radio main)
+  add_executable(test_${name} test_${name}.c fake_kernel.c)
+  target_include_directories(test_${name} PRIVATE fakes ../../firmware/src)
+  target_compile_definitions(test_${name} PRIVATE CONFIG_SYS_CLOCK_TICKS_PER_SEC=32768)
+  target_compile_options(test_${name} PRIVATE -Wall -Wextra -Werror -Wshadow)
+  if(PUCKOFF_SANITIZERS)
+    target_compile_options(test_${name} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+    target_link_options(test_${name} PRIVATE -fsanitize=address,undefined)
+  endif()
+  add_test(NAME receiver_${name} COMMAND test_${name})
+endforeach()
+
+target_sources(test_input PRIVATE ../../firmware/src/input.c)
+target_sources(test_link PRIVATE ../../firmware/src/input.c)
+target_link_libraries(test_link PRIVATE Threads::Threads)

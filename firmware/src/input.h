@@ -60,6 +60,8 @@ bool input_decode_report(const uint8_t *rep, size_t len, struct ctrl_state *out)
 
 /*
  * Scan a received radio packet ([length][S1][type][records...]) for input
- * reports. Returns true if at least one was found; *out holds the newest.
+ * reports within the supplied buffer size. Returns true only for a complete,
+ * valid F1 packet containing input; *out holds its last report. On failure
+ * *out is unchanged.
  */
-bool input_from_packet(const uint8_t *pkt, struct ctrl_state *out);
+bool input_from_packet(const uint8_t *pkt, size_t size, struct ctrl_state *out);
