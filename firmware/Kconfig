@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+mainmenu "PuckOff"
+
+source "Kconfig.zephyr"
+rsource "Kconfig.usb"

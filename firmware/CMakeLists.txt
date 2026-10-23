@@ -12,5 +12,6 @@ target_sources(app PRIVATE
 	src/input.c
 	src/usb.c
 	src/gamepad.c
-	src/console.c
 )
+target_sources_ifdef(CONFIG_PUCKOFF_USB_SWITCH app PRIVATE src/usb_switch.c)
+target_sources_ifdef(CONFIG_SHELL app PRIVATE src/console.c)

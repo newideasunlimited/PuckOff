@@ -1,13 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-/*
- * Generic HID gamepad: 16 buttons, a hat switch, two sticks and two analog
- * triggers. Works on Windows, macOS, Linux, Android, ChromeOS and in browsers
- * without drivers.
- */
+/* Generic HID: 16 buttons, a hat, two sticks and two analog triggers. */
 #include "gamepad.h"
 #include <string.h>
-#include <zephyr/sys/util.h>
 #include <zephyr/usb/class/hid.h>
+
+_Static_assert(sizeof(struct gamepad_report) == GAMEPAD_REPORT_SIZE, "gamepad layout");
 
 const uint8_t gamepad_hid_desc[] = {
 	HID_USAGE_PAGE(HID_USAGE_GEN_DESKTOP),
@@ -38,6 +35,7 @@ const uint8_t gamepad_hid_desc[] = {
 	0x65, 0x00,       /* Unit (none) */
 	HID_REPORT_COUNT(1),
 	HID_INPUT(0x03),
+	0x45, 0x00, /* Physical range 0..0: subsequent axes use their logical range. */
 
 	/* Sticks: X/Y left, Z/Rz right */
 	HID_USAGE(HID_USAGE_GEN_DESKTOP_X),
@@ -63,15 +61,18 @@ const uint8_t gamepad_hid_desc[] = {
 };
 const size_t gamepad_hid_desc_len = sizeof(gamepad_hid_desc);
 
-/* HID button number (1-based) for each controller button. */
 static const struct {
 	uint32_t ctrl;
-	uint8_t hid;
+	uint16_t hid;
 } button_map[] = {
-	{ BTN_A, 1 },     { BTN_B, 2 },     { BTN_X, 3 },      { BTN_Y, 4 },
-	{ BTN_LB, 5 },    { BTN_RB, 6 },    { BTN_VIEW, 7 },   { BTN_MENU, 8 },
-	{ BTN_L3, 9 },    { BTN_R3, 10 },   { BTN_STEAM, 11 }, { BTN_QAM, 12 },
-	{ BTN_L4, 13 },   { BTN_R4, 14 },   { BTN_L5, 15 },    { BTN_R5, 16 },
+	{ BTN_A, GAMEPAD_A },       { BTN_B, GAMEPAD_B },
+	{ BTN_X, GAMEPAD_X },       { BTN_Y, GAMEPAD_Y },
+	{ BTN_LB, GAMEPAD_LB },     { BTN_RB, GAMEPAD_RB },
+	{ BTN_VIEW, GAMEPAD_VIEW }, { BTN_MENU, GAMEPAD_MENU },
+	{ BTN_L3, GAMEPAD_L3 },     { BTN_R3, GAMEPAD_R3 },
+	{ BTN_STEAM, GAMEPAD_HOME }, { BTN_QAM, GAMEPAD_QAM },
+	{ BTN_L4, GAMEPAD_L4 },     { BTN_R4, GAMEPAD_R4 },
+	{ BTN_L5, GAMEPAD_L5 },     { BTN_R5, GAMEPAD_R5 },
 };
 
 static uint8_t hat_from(uint32_t b)
@@ -124,9 +125,9 @@ void gamepad_neutral(struct gamepad_report *out)
 void gamepad_from_ctrl(const struct ctrl_state *in, struct gamepad_report *out)
 {
 	gamepad_neutral(out);
-	for (size_t i = 0; i < ARRAY_SIZE(button_map); i++) {
+	for (size_t i = 0; i < sizeof(button_map) / sizeof(button_map[0]); i++) {
 		if (in->buttons & button_map[i].ctrl) {
-			out->buttons |= (uint16_t)(1u << (button_map[i].hid - 1));
+			out->buttons |= button_map[i].hid;
 		}
 	}
 	out->hat = hat_from(in->buttons);
@@ -136,4 +137,23 @@ void gamepad_from_ctrl(const struct ctrl_state *in, struct gamepad_report *out)
 	out->ry = flip(in->ry);
 	out->lt = trigger8(in->lt, in->buttons & BTN_LT_CLICK);
 	out->rt = trigger8(in->rt, in->buttons & BTN_RT_CLICK);
+}
+
+static void put16(uint8_t *out, uint16_t value)
+{
+	out[0] = (uint8_t)value;
+	out[1] = (uint8_t)(value >> 8);
+}
+
+void gamepad_encode_generic(const struct gamepad_report *in,
+			    uint8_t out[GAMEPAD_REPORT_SIZE])
+{
+	put16(out, in->buttons);
+	out[2] = in->hat;
+	put16(out + 3, (uint16_t)in->lx);
+	put16(out + 5, (uint16_t)in->ly);
+	put16(out + 7, (uint16_t)in->rx);
+	put16(out + 9, (uint16_t)in->ry);
+	out[11] = in->lt;
+	out[12] = in->rt;
 }

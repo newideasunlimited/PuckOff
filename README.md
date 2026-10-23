@@ -1,18 +1,23 @@
 # PuckOff
 
 Open firmware that turns a $5 nRF52840 board into a wireless receiver for the
-Steam Controller (2026), so it works on anything with a USB port.
+Steam Controller (2026). USB host recognition and game support vary; having a
+USB port is not enough to guarantee compatibility.
 
-Plug the board in, pair your controller, play.
+The current USB identities are for development, not shipping products. Generic
+mode uses the **private-test-only, non-unique `1209:0001` PID**, which must not be
+used on redistributed, sold, or manufactured devices. See
+[USB modes and compatibility](docs/usb-modes.md) before choosing an image.
 
 ## Status
 
 | Feature                                   | State        |
 |-------------------------------------------|--------------|
 | Controller link (2.4 GHz, 250 Hz)         | Working      |
-| Standard USB gamepad (PC, Mac, Linux, Android, browsers) | Working |
+| Generic USB HID gamepad                  | macOS HIDAPI and Brave input confirmed on the baseline; other hosts/games need testing |
 | Up to 4 controllers per board (radio)     | In progress  |
-| Xbox / PlayStation / Switch style modes    | Planned      |
+| Wired Switch / Pokken-style USB HID      | Implemented, opt-in; hardware validation pending |
+| Xbox / PlayStation console support       | Not implemented; no authentication support |
 | Steam receiver mode (pairing from Steam)  | Planned      |
 | Bluetooth to TVs, phones, Apple TV        | Planned      |
 | Move a controller between many boards     | Planned      |
@@ -46,7 +51,10 @@ Requires the nRF Connect SDK v3.4 (Zephyr 4.4).
 
     west build -b promicro_nrf52840/nrf52840/uf2 firmware
 
-The output is `build/firmware/zephyr/zephyr.uf2`.
+The output is `build/firmware/zephyr/zephyr.uf2`. Generic HID plus the serial
+console remains the default. The experimental wired Switch image has **no
+serial console**; build and recovery instructions are in
+[USB modes](docs/usb-modes.md).
 
 ## License
 
