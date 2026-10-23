@@ -7,6 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/atomic.h>
 
 #include "bond.h"
 #include "gamepad.h"
@@ -18,26 +19,27 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 static int active_slot = -1;
-static bool watch;
+static atomic_t watch;
 static struct ctrl_state last_seen;
 
 void main_set_watch(bool on)
 {
-	watch = on;
+	atomic_set(&watch, on);
 }
 
 static void on_input(int slot, const struct ctrl_state *st)
 {
 	struct gamepad_report r;
 
-	/* One gamepad per receiver for now: the most recently active controller drives it. */
-	if (active_slot != slot) {
-		active_slot = slot;
+	/* Keep the first input owner until it is explicitly released by the link. */
+	if (active_slot >= 0 && active_slot != slot) {
+		return;
 	}
+	active_slot = slot;
 	gamepad_from_ctrl(st, &r);
 	usb_send_gamepad(&r);
 
-	if (watch && (st->buttons != last_seen.buttons ||
+	if (atomic_get(&watch) && (st->buttons != last_seen.buttons ||
 		      abs(st->lx - last_seen.lx) > 2000 || abs(st->ly - last_seen.ly) > 2000 ||
 		      abs(st->rx - last_seen.rx) > 2000 || abs(st->ry - last_seen.ry) > 2000 ||
 		      abs(st->lt - last_seen.lt) > 2000 || abs(st->rt - last_seen.rt) > 2000)) {
@@ -55,41 +57,65 @@ static void on_lost(int slot)
 		gamepad_neutral(&r);
 		usb_send_gamepad(&r);
 		active_slot = -1;
+		last_seen = (struct ctrl_state){0};
 	}
 }
 
 int main(void)
 {
 	int err;
+	bool have_led = gpio_is_ready_dt(&led);
 
-	if (gpio_is_ready_dt(&led)) {
-		gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
+	if (have_led) {
+		err = gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
+		if (err) {
+			LOG_WRN("LED setup failed (%d)", err);
+			have_led = false;
+		}
 	}
 
-	err = bond_init();
-	if (err) {
-		LOG_ERR("pairing storage failed (%d)", err);
+	int storage_err = bond_init();
+
+	if (storage_err) {
+		LOG_ERR("pairing storage failed (%d); radio will not start", storage_err);
 	}
 	err = usb_start();
 	if (err) {
 		LOG_ERR("usb failed (%d)", err);
+		return err;
 	}
-	link_start(on_input, on_lost);
+	if (storage_err) {
+		return storage_err;
+	}
+	err = link_start(on_input, on_lost);
+	if (err) {
+		LOG_ERR("radio startup failed (%d)", err);
+		return err;
+	}
 	LOG_INF("PuckOff ready");
 
 	/* LED: slow blink = searching, solid = connected, fast blink = not paired. */
-	for (int t = 0;; t++) {
+	for (uint32_t t = 0;; t++) {
 		bool paired = false;
 
 		for (int i = 0; i < BOND_SLOTS; i++) {
-			paired |= bond_get(i)->used;
+			struct bond b;
+
+			err = bond_snapshot(i, &b);
+			if (err) {
+				LOG_ERR("slot %d: bond snapshot failed (%d)", i, err);
+			} else {
+				paired |= b.used;
+			}
 		}
-		if (link_any_connected()) {
-			gpio_pin_set_dt(&led, 1);
-		} else if (paired) {
-			gpio_pin_set_dt(&led, (t % 10) == 0);
-		} else {
-			gpio_pin_set_dt(&led, t & 1);
+		if (have_led) {
+			int value = link_any_connected() ? 1 : paired ? (t % 10) == 0 : t & 1;
+
+			err = gpio_pin_set_dt(&led, value);
+			if (err) {
+				LOG_WRN("LED update failed (%d)", err);
+				have_led = false;
+			}
 		}
 		k_msleep(100);
 	}

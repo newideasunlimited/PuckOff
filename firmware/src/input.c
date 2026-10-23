@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 #include "input.h"
+#include "radio.h"
 #include <string.h>
 
 #define REPORT_STATE_LEGACY 0x45
@@ -20,7 +21,7 @@ static int16_t s16le(const uint8_t *p)
 
 bool input_decode_report(const uint8_t *rep, size_t len, struct ctrl_state *out)
 {
-	if (len < MIN_STATE_LEN ||
+	if (rep == NULL || out == NULL || len < MIN_STATE_LEN ||
 	    (rep[0] != REPORT_STATE_LEGACY && rep[0] != REPORT_STATE)) {
 		return false;
 	}
@@ -55,26 +56,40 @@ bool input_decode_report(const uint8_t *rep, size_t len, struct ctrl_state *out)
 	return true;
 }
 
-bool input_from_packet(const uint8_t *pkt, struct ctrl_state *out)
+bool input_from_packet(const uint8_t *pkt, size_t size, struct ctrl_state *out)
 {
-	/* pkt[0] is the payload length; payload starts at pkt[2]. */
-	size_t end = (size_t)pkt[0] + 2;
+	struct ctrl_state latest;
+	size_t end;
 	size_t i = 3;
 	bool found = false;
 
-	while (i + 1 < end) {
+	if (pkt == NULL || out == NULL || size < 3 || pkt[0] < 1 ||
+	    pkt[0] > RADIO_MAX_PAYLOAD || (size_t)pkt[0] + 2 > size || pkt[2] != 0xF1) {
+		return false;
+	}
+	end = (size_t)pkt[0] + 2;
+	while (i < end) {
+		if (end - i < 2) {
+			return false;
+		}
 		uint8_t rlen = pkt[i];
 		uint8_t rtype = pkt[i + 1];
 		const uint8_t *val = pkt + i + 2;
 
-		if (rlen == 0 || i + 2 + rlen > end) {
-			break;
+		if (rlen == 0 || rlen > end - i - 2) {
+			return false;
 		}
-		if (rtype == RECORD_HID_REPORT &&
-		    input_decode_report(val, rlen, out)) {
-			found = true;
+		if (rtype == RECORD_HID_REPORT) {
+			if (input_decode_report(val, rlen, &latest)) {
+				found = true;
+			} else if (val[0] == REPORT_STATE_LEGACY || val[0] == REPORT_STATE) {
+				return false;
+			}
 		}
 		i += (size_t)rlen + 2;
+	}
+	if (found) {
+		*out = latest;
 	}
 	return found;
 }

@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+# NCS v3.4.1: the default receiver's source dependencies, without floating tags.
+manifest:
+  version: "0.13"
+  projects:
+    - name: nrf
+      url: https://github.com/nrfconnect/sdk-nrf
+      revision: b20f8619ba9a5530f8c34b0a130d829947cfe55d
+      path: nrf
+    - name: zephyr
+      url: https://github.com/nrfconnect/sdk-zephyr
+      revision: 33fa6a7aac6a4401d16a67cb9f27a3483fa02dd6
+      path: zephyr
+      west-commands: scripts/west-commands.yml
+    - name: cmsis
+      url: https://github.com/zephyrproject-rtos/cmsis
+      revision: 512cc7e895e8491696b61f7ba8066b4a182569b8
+      path: modules/hal/cmsis
+    - name: cmsis_6
+      url: https://github.com/zephyrproject-rtos/CMSIS_6
+      revision: 30a859f44ef8ab4dc8f84b03ed586fd16ccf9d74
+      path: modules/hal/cmsis_6
+    - name: hal_nordic
+      url: https://github.com/nrfconnect/sdk-hal_nordic
+      revision: 69865c20dc4afbdd27060ad1e81af1b62d31f7af
+      path: modules/hal/nordic
+    - name: nrfxlib
+      url: https://github.com/nrfconnect/sdk-nrfxlib
+      revision: bb715183a57ac501907b63df2079c3fbcd067641
+      path: nrfxlib
+    - name: mbedtls
+      url: https://github.com/nrfconnect/sdk-mbedtls
+      revision: 804249ddcdcf78a16f9be760b9ff1f65c2f29d9e
+      path: modules/crypto/mbedtls
+    - name: oberon-psa-crypto
+      url: https://github.com/nrfconnect/sdk-oberon-psa-crypto
+      revision: e8db62ed0fba5028e7ae0eba7b1fb63436ae6416
+      path: modules/crypto/oberon-psa-crypto
+    - name: zcbor
+      url: https://github.com/zephyrproject-rtos/zcbor
+      revision: 9164bd18dcd88ff9d9ef98279501fc1093571017
+      path: modules/lib/zcbor
+  self:
+    path: puckoff
