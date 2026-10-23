@@ -10,6 +10,15 @@
 
 static struct bond bonds[BOND_SLOTS];
 static K_MUTEX_DEFINE(bond_lock);
+static struct k_spinlock bond_data_lock;
+
+static void publish(int slot, const struct bond *b)
+{
+	k_spinlock_key_t key = k_spin_lock(&bond_data_lock);
+
+	bonds[slot] = *b;
+	k_spin_unlock(&bond_data_lock, key);
+}
 
 static void encode(const struct bond *b, uint8_t rec[BOND_RECORD_LEN])
 {
@@ -32,6 +41,7 @@ static int bond_settings_set(const char *name, size_t len, settings_read_cb read
 			     void *cb_arg)
 {
 	uint8_t rec[BOND_RECORD_LEN];
+	struct bond loaded;
 	int slot;
 
 	if (sscanf(name, "%d", &slot) != 1 || slot < 0 || slot >= BOND_SLOTS ||
@@ -41,7 +51,8 @@ static int bond_settings_set(const char *name, size_t len, settings_read_cb read
 	if (read_cb(cb_arg, rec, sizeof(rec)) != sizeof(rec)) {
 		return -EIO;
 	}
-	decode(rec, &bonds[slot]);
+	decode(rec, &loaded);
+	publish(slot, &loaded);
 	return 0;
 }
 
@@ -57,6 +68,19 @@ int bond_init(void)
 	return settings_load_subtree("bond");
 }
 
+int bond_snapshot(int slot, struct bond *out)
+{
+	k_spinlock_key_t key;
+
+	if (slot < 0 || slot >= BOND_SLOTS || out == NULL) {
+		return -EINVAL;
+	}
+	key = k_spin_lock(&bond_data_lock);
+	*out = bonds[slot];
+	k_spin_unlock(&bond_data_lock, key);
+	return 0;
+}
+
 const struct bond *bond_get(int slot)
 {
 	if (slot < 0 || slot >= BOND_SLOTS) {
@@ -65,44 +89,51 @@ const struct bond *bond_get(int slot)
 	return &bonds[slot];
 }
 
-static int save(int slot)
+static int save(int slot, const struct bond *candidate)
 {
 	char key[12];
 	uint8_t rec[BOND_RECORD_LEN];
 
 	snprintk(key, sizeof(key), "bond/%d", slot);
-	encode(&bonds[slot], rec);
+	encode(candidate, rec);
 	return settings_save_one(key, rec, sizeof(rec));
 }
 
 int bond_set(int slot, uint32_t receiver_id, uint32_t controller_id, const char *serial)
 {
+	struct bond candidate = {
+		.used = true,
+		.receiver_id = receiver_id,
+		.controller_id = controller_id,
+	};
 	int err;
 
 	if (slot < 0 || slot >= BOND_SLOTS || (receiver_id == 0 && controller_id == 0)) {
 		return -EINVAL;
 	}
+	strncpy(candidate.serial, serial ? serial : "", BOND_SERIAL_LEN);
 	k_mutex_lock(&bond_lock, K_FOREVER);
-	memset(&bonds[slot], 0, sizeof(bonds[slot]));
-	bonds[slot].used = true;
-	bonds[slot].receiver_id = receiver_id;
-	bonds[slot].controller_id = controller_id;
-	strncpy(bonds[slot].serial, serial ? serial : "", BOND_SERIAL_LEN);
-	err = save(slot);
+	err = save(slot, &candidate);
+	if (!err) {
+		publish(slot, &candidate);
+	}
 	k_mutex_unlock(&bond_lock);
 	return err;
 }
 
 int bond_clear(int slot)
 {
+	const struct bond candidate = {0};
 	int err;
 
 	if (slot < 0 || slot >= BOND_SLOTS) {
 		return -EINVAL;
 	}
 	k_mutex_lock(&bond_lock, K_FOREVER);
-	memset(&bonds[slot], 0, sizeof(bonds[slot]));
-	err = save(slot);
+	err = save(slot, &candidate);
+	if (!err) {
+		publish(slot, &candidate);
+	}
 	k_mutex_unlock(&bond_lock);
 	return err;
 }
