@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+
+choice PUCKOFF_TRANSPORT
+	prompt "PuckOff transport and radio owner"
+	default PUCKOFF_TRANSPORT_USB_RAW_RF
+
+config PUCKOFF_TRANSPORT_USB_RAW_RF
+	bool "USB gamepad with exclusive proprietary radio"
+	help
+	  The default receiver. Bluetooth and MPSL must be disabled because the
+	  polling driver owns RADIO directly.
+
+config PUCKOFF_TRANSPORT_BLE_DIAGNOSTIC
+	bool "BLE HID diagnostic (no controller radio)"
+	depends on SOC_NRF52840 && BT && BT_PERIPHERAL
+	help
+	  Advertise a BLE HID gamepad, with neutral input and explicit serial
+	  diagnostic commands only. This is not a Steam Controller receiver.
+	  The raw radio driver and controller link are not compiled.
+
+endchoice
