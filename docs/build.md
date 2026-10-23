@@ -60,6 +60,13 @@ an ELF for debugging, the generated firmware configuration, frozen manifest
 and build version/package information. GitHub Actions retain it for 14 days.
 The workflow does not publish releases or write to the main branch.
 
+Using the same locked SDK headers, CI also runs the USB descriptor/transport
+tests under address and undefined-behavior sanitizers. After uploading the
+existing default receiver artifact, it builds and validates the opt-in Switch
+and timed-recovery UF2s without uploading either image. These profiles remain
+hardware-unverified; see [USB modes](usb-modes.md) for their limitations and
+private test procedures. The default artifact upload policy is unchanged.
+
 This checks repeatability for the pinned build on the selected CI runner.
 The Ubuntu runner image and host packages can receive updates; byte identity
 across every OS or future runner image is not asserted. Build success also

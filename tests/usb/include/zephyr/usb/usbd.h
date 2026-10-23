@@ -26,7 +26,8 @@ extern const struct device test_device;
 
 enum usbd_speed { USBD_SPEED_FS };
 enum usbd_msg_type {
-	USBD_MSG_SUSPEND, USBD_MSG_RESUME, USBD_MSG_VBUS_READY, USBD_MSG_VBUS_REMOVED
+	USBD_MSG_SUSPEND, USBD_MSG_RESUME, USBD_MSG_RESET,
+	USBD_MSG_VBUS_READY, USBD_MSG_VBUS_REMOVED
 };
 struct usbd_msg {
 	enum usbd_msg_type type;

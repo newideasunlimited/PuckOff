@@ -561,6 +561,43 @@ static void test_disconnect_during_retry(void)
 	enable_error = 0;
 }
 
+static void test_reset_after_deferred_suspend(void)
+{
+	struct gamepad_report neutral = fixture();
+	struct gamepad_report report = neutral;
+
+	report.buttons = GAMEPAD_A;
+	usb_send_gamepad(&report);
+	run_work();
+	assert(accepted == 1 && owned_buffer);
+	ops->iface_ready(&test_device, false);
+	ops->iface_ready(&test_device, true);
+	message(USBD_MSG_SUSPEND);
+	usb_send_gamepad(&neutral);
+	message(USBD_MSG_RESET);
+	run_work();
+	assert(accepted == 1 && owned_buffer);
+	assert(memcmp(owned_buffer, owned_snapshot, REPORT_SIZE) == 0);
+	complete(false);
+	assert(accepted == 2);
+	assert_report(&neutral);
+	complete(false);
+
+	/* RESET must clear suspend, not invent an active configuration. */
+	ops->iface_ready(&test_device, false);
+	message(USBD_MSG_SUSPEND);
+	report.buttons = GAMEPAD_B;
+	usb_send_gamepad(&report);
+	message(USBD_MSG_RESET);
+	run_work();
+	assert(accepted == 2 && !owned_buffer);
+	ops->iface_ready(&test_device, true);
+	run_work();
+	assert(accepted == 3);
+	assert_report(&report);
+	complete(false);
+}
+
 #if defined(CONFIG_PUCKOFF_USB_SWITCH)
 static void test_output_reports(void)
 {
@@ -616,6 +653,7 @@ int main(void)
 	test_completion_before_submit_returns();
 	test_idle_and_suspend();
 	test_disconnect_during_retry();
+	test_reset_after_deferred_suspend();
 #if defined(CONFIG_PUCKOFF_USB_SWITCH)
 	test_output_reports();
 #endif

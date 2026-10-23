@@ -323,7 +323,8 @@ static void msg_cb(struct usbd_context *const ctx, const struct usbd_msg *const 
 {
 	int err = 0;
 
-	if (msg->type == USBD_MSG_SUSPEND || msg->type == USBD_MSG_RESUME) {
+	if (msg->type == USBD_MSG_SUSPEND || msg->type == USBD_MSG_RESUME ||
+	    msg->type == USBD_MSG_RESET) {
 		K_SPINLOCK(&lock) {
 			suspended = msg->type == USBD_MSG_SUSPEND;
 			have_pending = true;

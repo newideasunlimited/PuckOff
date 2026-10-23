@@ -226,7 +226,10 @@ Tests cover descriptor bit lengths/usages/ranges, golden report bytes, each
 button, all 16 D-pad combinations, all 65,536 stick values, trigger thresholds,
 short/invalid control transfers, output lengths, idle timing, suspend, failed-submit
 coalescing, final-neutral retries, reconnect while a buffer is owned, early
-completion and a completion racing the stack's buffer-pool release. These are
+completion and a completion racing the stack's buffer-pool release. They also
+cover reconfiguration followed by a deferred SUSPEND and RESET without RESUME:
+RESET clears suspension and schedules the latest state, but neither invents an
+active configuration nor releases a buffer still owned by the USB stack. These are
 software checks, not USB electrical or console acceptance tests. The separate
 recovery-image test verifies no reboot before 120 seconds and the bootloader
 magic/cold-reboot call at the deadline; it does not claim a physical remount.
