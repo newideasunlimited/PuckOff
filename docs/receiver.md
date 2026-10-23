@@ -51,7 +51,8 @@ thread preemption and diagnostic printing can still delay execution. This is
 not a hard real-time guarantee or a measured end-to-end latency claim.
 
 Operational radio errors, malformed frames, CRC errors and budget deferrals
-have separate counters in `link_stats`. Hardware errors are rate-limited in
+have separate counters in `link_stats` and the human `status` command
+(`invalid`, `radio-errors`, `deferred`). Hardware errors are rate-limited in
 logs. Storage, USB and radio startup errors propagate out of `main()` rather
 than printing a false ready message; USB setup is still attempted after a
 storage error so the setup console can expose the fault.
