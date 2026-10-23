@@ -21,6 +21,8 @@ struct bond {
 #define BOND_RECORD_LEN (4 + 4 + BOND_SERIAL_LEN)
 
 int bond_init(void);
+/* Copies a coherent value without holding a lock during flash I/O. */
+int bond_snapshot(int slot, struct bond *out);
 const struct bond *bond_get(int slot);
 int bond_set(int slot, uint32_t receiver_id, uint32_t controller_id, const char *serial);
 int bond_clear(int slot);
