@@ -259,9 +259,9 @@ class TransportTests(PairingTest):
         stream = FakeStream((A, None, None, None))
         self.wire(stream).request("import", "0", B.hex(), A.hex())
         command_size = len(stream.writes[-1])
-        config = (ROOT / "firmware" / "prj.conf").read_text()
+        config = (ROOT / "firmware" / "Kconfig.usb").read_text()
         for name in ("SHELL_BACKEND_SERIAL_RX_RING_BUFFER_SIZE", "SHELL_CMD_BUFF_SIZE"):
-            size = re.search(rf"^CONFIG_{name}=(\d+)$", config, re.MULTILINE)
+            size = re.search(rf"^config {name}\n[ \t]+default (\d+)$", config, re.MULTILINE)
             self.assertIsNotNone(size)
             self.assertLess(command_size, int(size[1]))
 
