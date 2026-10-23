@@ -28,6 +28,23 @@ not four simultaneous controllers. It discovers slots in ascending cyclic
 order; the first valid input selects an owner until input loss, goodbye, or
 bond replacement. Other stored controllers cannot overwrite that owner's input.
 
+In the official 2026 puck's read-only `bonds -h` shell output,
+`ibexN_proteus_uuid` is the **receiver** ID and `ibexN_ibex_uuid` is the
+**controller** ID. This ordering was confirmed against the pairing that worked
+on PuckOff; the word `ibex` in the rendezvous address is not evidence for
+reversing these fields. `ibexN_peer_sn` supplies the serial.
+
+The importer preserves this ordering and requires both IDs to be nonzero in a
+used record. It accepts up to 16 non-space printable ASCII serial bytes with
+zero padding, and rejects truncation, control characters, and nonzero bytes
+after a NUL. Empty slots are all-zero records. These are explicit importer
+validation rules, not claims about every possible future Valve firmware.
+
+See [pairing and migration](pairing.md) and the
+[PuckOff management protocol](management.md). Native over-air pairing is not
+implemented; the established advertisement/polling protocol alone does not
+describe a verified pairing handshake.
+
 ## Finding the controller
 
 A controller looking for its receiver listens on the shared **rendezvous**

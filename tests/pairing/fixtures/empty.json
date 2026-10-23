@@ -1,0 +1,10 @@
+{
+  "format": "org.puckoff.bonds",
+  "version": 1,
+  "slots": [
+    {"slot": 0, "record": null},
+    {"slot": 1, "record": null},
+    {"slot": 2, "record": null},
+    {"slot": 3, "record": null}
+  ]
+}

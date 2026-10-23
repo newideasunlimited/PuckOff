@@ -21,8 +21,15 @@ struct bond {
 #define BOND_RECORD_LEN (4 + 4 + BOND_SERIAL_LEN)
 
 int bond_init(void);
+bool bond_storage_ready(void);
 /* Copies a coherent value without holding a lock during flash I/O. */
 int bond_snapshot(int slot, struct bond *out);
-const struct bond *bond_get(int slot);
+/* Exports one coherent table. Empty slots are all-zero records. */
+int bond_export(uint8_t records[BOND_SLOTS][BOND_RECORD_LEN]);
+/* Both mutations compare the current record with expected before writing. */
+int bond_import(int slot, const uint8_t record[BOND_RECORD_LEN],
+		const uint8_t expected[BOND_RECORD_LEN]);
+int bond_clear_if(int slot, const uint8_t expected[BOND_RECORD_LEN]);
+/* Legacy recovery API: set refuses replacement; clear is explicitly destructive. */
 int bond_set(int slot, uint32_t receiver_id, uint32_t controller_id, const char *serial);
 int bond_clear(int slot);
