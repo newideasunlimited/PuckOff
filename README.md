@@ -1,8 +1,12 @@
 # PuckOff
 
-Open firmware that turns a $5 nRF52840 board into a wireless receiver for the
-Steam Controller (2026). USB host recognition and game support vary; having a
-USB port is not enough to guarantee compatibility.
+Open prototype firmware that turns a nice!nano-compatible nRF52840 board into
+a wireless receiver for the Steam Controller (2026), exposing one USB HID
+gamepad.
+
+Baseline hardware checks cover one controller on macOS/Brave. Other hosts,
+boards, consoles and the current reliability changes need hardware validation;
+a USB port alone does not imply compatibility.
 
 The current USB identities are for development, not shipping products. Generic
 mode uses the **private-test-only, non-unique `1209:0001` PID**, which must not be
@@ -13,9 +17,9 @@ used on redistributed, sold, or manufactured devices. See
 
 | Feature                                   | State        |
 |-------------------------------------------|--------------|
-| Controller link (2.4 GHz, 250 Hz)         | Working      |
+| Controller link (2.4 GHz, 250 Hz target)  | Baseline demonstrated on one controller |
 | Generic USB HID gamepad                  | macOS HIDAPI and Brave input confirmed on the baseline; other hosts/games need testing |
-| Up to 4 controllers per board (radio)     | In progress  |
+| Four stored bonds, one active controller | Implemented; not four simultaneous gamepads |
 | Wired Switch / Pokken-style USB HID      | Implemented, opt-in; hardware validation pending |
 | Xbox / PlayStation console support       | Not implemented; no authentication support |
 | Steam receiver mode (pairing from Steam)  | Planned      |
@@ -24,16 +28,23 @@ used on redistributed, sold, or manufactured devices. See
 
 ## Hardware
 
-Any nRF52840 "Pro Micro" / nice!nano-compatible board with the Adafruit UF2
-bootloader (SoftDevice S140 6.x layout).
+Build target: `promicro_nrf52840/nrf52840/uf2`, using an Adafruit UF2
+bootloader with the SoftDevice S140 6.x memory layout. Check your particular
+board and bootloader before flashing; not every nRF52840 board is interchangeable.
 
 ## Install
 
-1. Double-tap the board's **RST** pin to **GND** with a paperclip. A drive called
-   `NICENANO` appears.
-2. Copy `puckoff.uf2` onto it. The board reboots as **PuckOff Receiver**.
+1. Double-tap the board's **RST** pin to **GND** with a paperclip. On a matching
+   bootloader, wait for the `NICENANO` drive to mount; USB re-enumeration alone
+   does not guarantee a mounted drive.
+2. Copy a matching `puckoff.uf2` onto it. The board reboots as **PuckOff Receiver**.
+
+The **Receiver** GitHub Actions workflow produces a commit-specific UF2
+artifact, not a release. Unzip it before copying the firmware, and confirm the
+board/bootloader layout above.
 
 Later updates: type `bootloader` in the serial console instead of using a paperclip.
+If the drive does not mount, see the [recovery notes](docs/build.md#recovery).
 
 ## Pairing (for now)
 
@@ -47,14 +58,19 @@ Pairing from Steam is planned and will replace this step.
 
 ## Build from source
 
-Requires the nRF Connect SDK v3.4 (Zephyr 4.4).
+The default build locks nRF Connect SDK **v3.4.1** sources and Zephyr SDK
+**1.0.1**. See [build and CI instructions](docs/build.md) for a fresh workspace
+and [receiver reliability](docs/receiver.md) for host tests and hardware checks.
 
-    west build -b promicro_nrf52840/nrf52840/uf2 firmware
+From an existing matching SDK workspace:
 
-The output is `build/firmware/zephyr/zephyr.uf2`. Generic HID plus the serial
-console remains the default. The experimental wired Switch image has **no
-serial console**; build and recovery instructions are in
-[USB modes](docs/usb-modes.md).
+    west build --sysbuild -b promicro_nrf52840/nrf52840/uf2 \
+      -d /path/to/PuckOff/build/receiver /path/to/PuckOff/firmware
+
+The output is `build/receiver/firmware/zephyr/zephyr.uf2` in that checkout.
+Generic HID plus the serial console remains the default. The experimental
+wired Switch image has **no serial console**; build and recovery instructions
+are in [USB modes](docs/usb-modes.md).
 
 ## License
 

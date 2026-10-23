@@ -2,7 +2,7 @@
 
 choice PUCKOFF_USB_MODE
 	prompt "USB gamepad profile"
-	depends on USB_DEVICE_STACK_NEXT
+	depends on USB_DEVICE_STACK_NEXT && PUCKOFF_TRANSPORT_USB_RAW_RF
 	default PUCKOFF_USB_GENERIC
 
 config PUCKOFF_USB_GENERIC
