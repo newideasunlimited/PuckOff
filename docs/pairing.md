@@ -44,10 +44,17 @@ Close serial terminals and other companion apps first. Connections are
 exclusive on macOS/Linux, use 115200 baud and DTR, and do not reset the board.
 Leave the Zephyr shell's echo, metakeys, and VT100 support enabled. The tool
 clears any unfinished input with Ctrl-U and waits for a clear-EOS reply before
-sending a command terminator. If that fails, it sends no command and stops.
-Do not work around this with a leading Enter: it could execute unfinished
-input left by another terminal. Turn `watch off` manually before setup if
-continuous logs prevent the console from settling.
+sending a command terminator. On a PuckOff receiver, if that fails, it sends
+no command and stops. Do not work around this with a leading Enter: it could
+execute unfinished input left by another terminal. Turn `watch off` manually
+before setup if continuous logs prevent the console from settling.
+
+The official puck clears its line on Ctrl-U but sends no clear-EOS reply, and
+it prints `dongle~$` only after a carriage return. On a `valve` port only, and
+only when Ctrl-U went unanswered, the tool therefore sends one bare carriage
+return after the Ctrl-U and requires the reply to be nothing but whitespace
+and a single fresh `dongle~$` prompt. Any other output (an echoed command, an
+error, a second prompt, or silence) stops the tool before `bonds -h` is sent.
 
 The port names below are placeholders. Substitute the exact paths from
 `devices`; on macOS they usually start with `/dev/cu.usbmodem`.
@@ -215,9 +222,12 @@ workflow.
 
 All bond/serial fixtures are invented. `line-clear.json` is a non-sensitive
 protocol observation: the coordinator confirmed that Ctrl-U on the original
-PuckOff firmware returns exactly `ESC[J`, without a preceding CR. The official
-puck's descriptor tuple, field grammar, and receiver/controller ordering were
-also confirmed by the coordinator from an earlier successful pairing.
+PuckOff firmware returns exactly `ESC[J`, without a preceding CR.
+`dongle-prompt.json` records the official puck's reply to a bare carriage
+return after an unanswered Ctrl-U: CRLF and `dongle~$ ` (observed on the
+coordinator's puck, 2026-11-01). The official puck's descriptor tuple, field
+grammar, and receiver/controller ordering were also confirmed by the
+coordinator from an earlier successful pairing.
 No competitor implementation code is used.
 
 Only the coordinator should perform the following physical checks for this
@@ -235,8 +245,9 @@ change; host tests and a board build do not substitute for them:
    an authorized backed-up replacement/clear and verify that other slots stay
    unchanged. Verify neutral input and reconnection with the core reliability
    changes integrated.
-4. When the official puck is available, confirm its Ctrl-U clear-EOS reply
-   before allowing `bonds -h`. Export into a private file without recording
+4. When the official puck is available, confirm that Ctrl-U followed by one
+   carriage return yields only a bare `dongle~$` prompt before `bonds -h` is
+   allowed (the puck does not send clear-EOS). Export into a private file without recording
    the transcript, copy an explicitly chosen slot, disconnect the source,
    and verify the controller works on the destination. Leave the source
    pairing untouched. Fail closed if cancellation or parsing differs.

@@ -284,7 +284,8 @@ class Wire:
                 break
         raise SetupError("busy", "Console output did not settle; close other terminals and turn watch off.")
 
-    def prepare(self) -> None:
+    def clear_line(self) -> bool:
+        """Send Ctrl-U; return whether the console acknowledged it with clear-EOS."""
         self.drain()
         # A CR could execute another terminal's unfinished command. Ctrl-U clears
         # Zephyr's edit buffer; require its VT100 acknowledgment before any CR.
@@ -297,9 +298,43 @@ class Wire:
                 break
             if b"\x1b[J" in received or b"\x1b[0J" in received:
                 self.drain()
-                return
+                return True
+        return False
+
+    def prepare(self) -> None:
+        if not self.clear_line():
+            raise SetupError(
+                "unsafe_console", "No line-clear acknowledgment; no command was sent. Use the default echo-enabled Zephyr shell."
+            )
+
+    def prepare_valve(self) -> None:
+        """Official-puck handshake: Ctrl-U, then at most one bare CR that must
+        produce nothing but a fresh `dongle~$` prompt.
+
+        The official puck clears its edit buffer on Ctrl-U but does not emit the
+        VT100 clear-EOS reply, and it prints its prompt only after a CR. The CR
+        is sent only on a Valve port, only after Ctrl-U, and only once. Any reply
+        other than whitespace plus one bare prompt means the console was not
+        idle (or the CR executed something), so the tool stops without sending
+        `bonds -h`.
+        """
+        if self.clear_line():
+            return
+        self.write(b"\r")
+        deadline = time.monotonic() + self.timeout
+        received = bytearray()
+        while time.monotonic() < deadline:
+            received.extend(self.read())
+            if len(received) > RECEIVE_LIMIT:
+                break
+            text = ANSI.sub(b"", bytes(received))
+            if text.rstrip(b" ").endswith(b"dongle~$"):
+                if re.fullmatch(rb"[\r\n\t ]*dongle~\$ ?", text):
+                    self.drain()
+                    return
+                break
         raise SetupError(
-            "unsafe_console", "No line-clear acknowledgment; no command was sent. Use the default echo-enabled Zephyr shell."
+            "unsafe_console", "No clean dongle prompt after the line clear; `bonds -h` was not sent. Close other terminals."
         )
 
     def request(self, op: str, *arguments: str) -> dict:
@@ -356,7 +391,7 @@ class Wire:
         raise SetupError("timeout", "No matching management response; check the port and firmware version.")
 
     def valve_bonds(self) -> Snapshot:
-        self.prepare()
+        self.prepare_valve()
         self.write(b"bonds -h\r")
         deadline = time.monotonic() + self.timeout
         received = bytearray()

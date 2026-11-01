@@ -28,6 +28,7 @@ SOURCE = (A, B, None, None)
 SOURCE_PORT = "/dev/synthetic-source"
 TARGET_PORT = "/dev/synthetic-target"
 LINE_CLEAR = json.loads((FIXTURES / "line-clear.json").read_bytes())
+DONGLE_PROMPT = json.loads((FIXTURES / "dongle-prompt.json").read_bytes())
 
 
 def fixture_response(name):
@@ -43,6 +44,7 @@ class FakeStream:
         self.ops = []
         self.clear_ack = True
         self.clear_reply = bytes.fromhex(LINE_CLEAR["reply_hex"])
+        self.prompt_reply = bytes.fromhex(DONGLE_PROMPT["reply_hex"])
         self.chunk_size = 256
         self.errors = {}
         self.drop = set()
@@ -63,6 +65,10 @@ class FakeStream:
                 self.pending.extend(self.clear_reply)
             return len(data)
         if self.kind == "valve":
+            if data == b"\r":
+                assert self.writes[-2:] == [b"\x15", b"\r"], "A bare CR must directly follow Ctrl-U"
+                self.pending.extend(self.prompt_reply)
+                return len(data)
             assert data == b"bonds -h\r", "No other command is allowed on a Valve source"
             self.ops.append("bonds -h")
             self.pending.extend((FIXTURES / "valve-bonds.txt").read_bytes().replace(b"\n", b"\r\n"))
@@ -309,6 +315,43 @@ class TransportTests(PairingTest):
         stream = FakeStream(kind="valve")
         self.assertEqual(self.wire(stream).valve_bonds(), SOURCE)
         self.assertEqual(stream.writes, [b"\x15", b"bonds -h\r"])
+
+    def test_valve_without_line_clear_reply_needs_one_bare_prompt(self):
+        stream = FakeStream(kind="valve")
+        stream.clear_ack = False
+        self.assertEqual(self.wire(stream).valve_bonds(), SOURCE)
+        self.assertEqual(stream.writes, [b"\x15", b"\r", b"bonds -h\r"])
+
+    def test_valve_prompt_fallback_accepts_only_whitespace_and_prompt(self):
+        for reply in (
+            b"\r\nUnknown command: foo\r\ndongle~$ ",
+            b"\r\ndongle~$ bonds -h\r\n\r\ndongle~$ ",
+            b"dongle~$ x",
+            b"\x1b[32mdongle~$\x1b[0m something\r\n",
+            b"",
+        ):
+            stream = FakeStream(kind="valve")
+            stream.clear_ack = False
+            stream.prompt_reply = reply
+            with self.assertRaises(setup.SetupError, msg=reply) as error:
+                self.wire(stream).valve_bonds()
+            self.assertEqual(error.exception.code, "unsafe_console")
+            self.assertEqual(stream.writes, [b"\x15", b"\r"], reply)
+
+    def test_valve_prompt_fallback_tolerates_ansi_and_bare_prompt(self):
+        for reply in (b"\x1b[1;32mdongle~$\x1b[0m ", b"\r\n\r\ndongle~$", b"dongle~$ "):
+            stream = FakeStream(kind="valve")
+            stream.clear_ack = False
+            stream.prompt_reply = reply
+            self.assertEqual(self.wire(stream).valve_bonds(), SOURCE, reply)
+
+    def test_puckoff_never_gets_the_prompt_fallback(self):
+        stream = FakeStream()
+        stream.clear_ack = False
+        with self.assertRaises(setup.SetupError) as error:
+            self.wire(stream).request("export")
+        self.assertEqual(error.exception.code, "unsafe_console")
+        self.assertEqual(stream.writes, [b"\x15"])
 
     def test_bounded_unknown_and_malformed_frames(self):
         hooks = [
