@@ -1,0 +1,19 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/*
+ * Boot guard record: 128 bytes of RAM that neither the kernel nor the Adafruit
+ * UF2 bootloader touches. The bootloader owns 0x20008000 and up (plus its
+ * double-reset word at 0x20007F7C) and runs on every reset; the MBR uses the
+ * first 8 bytes of RAM. The kernel's RAM starts after this region.
+ */
+/ {
+	retained0: retained@20000080 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		reg = <0x20000080 0x80>;
+		zephyr,memory-region = "RETAINED";
+		status = "okay";
+	};
+};
+
+&sram0 {
+	reg = <0x20000100 0x3FF00>;
+};

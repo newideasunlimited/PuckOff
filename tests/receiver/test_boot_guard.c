@@ -4,6 +4,10 @@
 #define CONFIG_PUCKOFF_BOOT_GUARD 1
 #define CONFIG_PUCKOFF_BOOT_GUARD_TIMEOUT_S 10
 #define CONFIG_PUCKOFF_BOOT_GUARD_MAX_RUNTIME_RESETS 3
+#define CONFIG_MPSL_ASSERT_HANDLER 1
+#define CONFIG_BT_CTLR_ASSERT_HANDLER 1
+static int halts;
+#define BOOT_GUARD_HALT() halts++
 #include "../../firmware/src/boot_guard.c"
 
 NRF_POWER_Type test_power;
@@ -88,6 +92,7 @@ int main(void)
 	boot_guard_get_status(&st);
 	CHECK(st.previous_stage == BOOT_STAGE_UNKNOWN && st.watchdog_resets == 0);
 	CHECK(st.watchdog_running && st.timeout_s == 10 && st.reset_cause == 0);
+	CHECK(st.fault == BOOT_FAULT_NONE && st.previous_detail == 0);
 
 	/* The feed starts with the first stage from main() and keeps itself going. */
 	CHECK(!feed_work.scheduled);
@@ -158,6 +163,43 @@ int main(void)
 	CHECK(boot_guard_early() == 0 && test_wdt.starts == 0 && test_wdt.CRV == 12345);
 	boot_guard_get_status(&st);
 	CHECK(st.watchdog_running);
+
+	/* Faults are recorded for the next boot, which reports them in safe mode. */
+	reset_with(NRF_POWER_RESETREAS_SREQ_MASK, BOOT_STAGE_READY, 0);
+	CHECK(boot_guard_early() == 0);
+	boot_guard_stage(BOOT_STAGE_BLUETOOTH);
+	boot_guard_detail(3);
+	struct arch_esf esf = { .basic = { .pc = 0x26ABC } };
+
+	k_sys_fatal_error_handler(K_ERR_KERNEL_OOPS, &esf);
+	CHECK(halts == 1 && guard.fault == BOOT_FAULT_KERNEL && guard.fault_code == 3);
+	CHECK(guard.fault_pc == 0x26ABC && guard.stage == BOOT_STAGE_BLUETOOTH && guard.detail == 3);
+	reset_with(NRF_POWER_RESETREAS_DOG_MASK, guard.stage, 0);
+	guard.detail = 3;
+	guard.fault = BOOT_FAULT_KERNEL;
+	guard.fault_code = 3;
+	guard.fault_pc = 0x26ABC;
+	CHECK(boot_guard_early() == 0 && boot_guard_safe_mode());
+	boot_guard_get_status(&st);
+	CHECK(st.previous_stage == BOOT_STAGE_BLUETOOTH && st.previous_detail == 3);
+	CHECK(st.fault == BOOT_FAULT_KERNEL && st.fault_code == 3 && st.fault_pc == 0x26ABC);
+	CHECK(guard.fault == BOOT_FAULT_NONE && guard.detail == 0); /* consumed */
+	CHECK(strcmp(boot_fault_name(st.fault), "kernel") == 0);
+
+	/* Stack assertions keep the end of a long path and the line number. */
+	mpsl_assert_handle("/very/long/path/to/mpsl_timeslot.c", 4242);
+	CHECK(halts == 2 && guard.fault == BOOT_FAULT_MPSL && guard.fault_code == 4242);
+	CHECK(strcmp((const char *)guard.fault_file, "timeslot.c") == 0 ||
+	      strcmp((const char *)guard.fault_file, "_timeslot.c") == 0);
+	CHECK(guard.fault_file[BOOT_FAULT_FILE_LEN - 1] == 0);
+	bt_ctlr_assert_handle("sdc.c", 7);
+	CHECK(halts == 3 && guard.fault == BOOT_FAULT_CTLR && guard.fault_code == 7);
+	CHECK(strcmp((const char *)guard.fault_file, "sdc.c") == 0);
+	/* A fault with no valid record (before the guard ran) is not recorded. */
+	guard.magic = 0;
+	k_sys_fatal_error_handler(K_ERR_CPU_EXCEPTION, NULL);
+	CHECK(halts == 4 && guard.fault == BOOT_FAULT_CTLR);
+	guard.magic = GUARD_MAGIC;
 
 	/* Without a running watchdog the bootloader request reboots directly. */
 	status.watchdog_running = false;

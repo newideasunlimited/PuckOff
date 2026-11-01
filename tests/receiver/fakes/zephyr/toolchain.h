@@ -3,3 +3,4 @@
 
 #define __aligned(n) __attribute__((aligned(n)))
 #define __packed __attribute__((packed))
+#define Z_GENERIC_SECTION(segment)

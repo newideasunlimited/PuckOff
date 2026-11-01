@@ -7,6 +7,7 @@
 #include "gamepad.h"
 #include "hid_map.h"
 #include "report_state.h"
+#include "../boot_guard.h"
 
 #include <errno.h>
 #include <string.h>
@@ -345,29 +346,36 @@ int ble_gamepad_start(void)
 	if (started) {
 		return -EALREADY;
 	}
+	/* bootguard detail: 1 attributes, 2 settings, 3 in bt_enable, 4 enabled, 5 bt settings, 6 advertising */
+	boot_guard_detail(1);
 	err = find_report_attributes();
 	if (err) {
 		LOG_ERR("HID service layout mismatch");
 		return err;
 	}
 	ble_report_reset(&state);
+	boot_guard_detail(2);
 	err = settings_subsys_init();
 	if (err) {
 		return err;
 	}
+	boot_guard_detail(3);
 	err = bt_enable(NULL);
 	if (err) {
 		return err;
 	}
+	boot_guard_detail(4);
 	err = settings_load_subtree("bt");
 	if (err) {
 		LOG_ERR("BLE host settings failed (%d); not advertising", err);
 		return err;
 	}
+	boot_guard_detail(5);
 	k_mutex_lock(&state_lock, K_FOREVER);
 	started = true;
 	k_mutex_unlock(&state_lock);
 	k_work_schedule(&advertise_work, K_NO_WAIT);
+	boot_guard_detail(6);
 	return 0;
 }
 

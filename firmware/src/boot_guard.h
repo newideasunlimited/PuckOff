@@ -21,6 +21,19 @@ enum boot_stage {
 	BOOT_STAGE_BOOTLOADER = 7, /* deliberately on the way to the UF2 drive */
 };
 
+/* Finer progress inside a stage; the meaning is documented where it is set. */
+#define BOOT_DETAIL_NONE 0
+
+/* What ended the previous run, besides the watchdog itself. */
+enum boot_fault {
+	BOOT_FAULT_NONE = 0,
+	BOOT_FAULT_KERNEL = 1, /* k_sys_fatal_error_handler: code is the kernel reason */
+	BOOT_FAULT_MPSL = 2,   /* MPSL assertion: file and line */
+	BOOT_FAULT_CTLR = 3,   /* SoftDevice Controller assertion: file and line */
+};
+
+#define BOOT_FAULT_FILE_LEN 12
+
 struct boot_guard_decision {
 	bool safe_mode;  /* start USB and the console only */
 	bool bootloader; /* go straight to the UF2 drive, without a watchdog */
@@ -29,7 +42,12 @@ struct boot_guard_decision {
 struct boot_guard_status {
 	uint32_t reset_cause;    /* raw RESETREAS captured at this boot */
 	uint8_t previous_stage;  /* enum boot_stage the previous run reached */
+	uint8_t previous_detail;
 	uint8_t watchdog_resets; /* consecutive watchdog resets, this one included */
+	uint8_t fault;           /* enum boot_fault of the previous run */
+	uint32_t fault_code;     /* kernel reason or assertion line */
+	uint32_t fault_pc;       /* faulting instruction for kernel faults */
+	char fault_file[BOOT_FAULT_FILE_LEN];
 	bool safe_mode;
 	bool watchdog_running;
 	uint16_t timeout_s;
@@ -44,9 +62,11 @@ struct boot_guard_status {
 void boot_guard_decide(bool watchdog_reset, uint8_t previous_stage, uint8_t watchdog_resets,
 		       struct boot_guard_decision *out);
 const char *boot_stage_name(uint8_t stage);
+const char *boot_fault_name(uint8_t fault);
 
 #ifdef CONFIG_PUCKOFF_BOOT_GUARD
 void boot_guard_stage(enum boot_stage stage);
+void boot_guard_detail(uint8_t detail);
 bool boot_guard_safe_mode(void);
 void boot_guard_get_status(struct boot_guard_status *out);
 /*
@@ -60,6 +80,10 @@ int boot_guard_request_bootloader(void);
 static inline void boot_guard_stage(enum boot_stage stage)
 {
 	(void)stage;
+}
+static inline void boot_guard_detail(uint8_t detail)
+{
+	(void)detail;
 }
 static inline bool boot_guard_safe_mode(void)
 {

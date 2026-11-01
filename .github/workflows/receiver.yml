@@ -92,7 +92,8 @@ jobs:
           cmp build/receiver/firmware/zephyr/zephyr.uf2 build/repro/firmware/zephyr/zephyr.uf2
           python puckoff/ci/check_uf2.py build/receiver/firmware/zephyr/zephyr.uf2
           west build --sysbuild -b promicro_nrf52840/nrf52840/uf2 \
-            -d build/ble-bridge puckoff/firmware -- -DEXTRA_CONF_FILE=ble-bridge.conf
+            -d build/ble-bridge puckoff/firmware -- -DEXTRA_CONF_FILE=ble-bridge.conf \
+            -DEXTRA_DTC_OVERLAY_FILE=ble-bridge.overlay
           python puckoff/ci/check_uf2.py build/ble-bridge/firmware/zephyr/zephyr.uf2
           mkdir artifacts
           cp build/receiver/firmware/zephyr/zephyr.uf2 artifacts/puckoff.uf2

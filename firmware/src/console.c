@@ -201,7 +201,17 @@ static int cmd_bootguard(const struct shell *sh, size_t argc, char **argv)
 		    (guard.reset_cause & NRF_POWER_RESETREAS_DOG_MASK) ? " watchdog" : "",
 		    (guard.reset_cause & NRF_POWER_RESETREAS_SREQ_MASK) ? " soft" : "",
 		    (guard.reset_cause & NRF_POWER_RESETREAS_LOCKUP_MASK) ? " lockup" : "");
-	shell_print(sh, "previous boot reached: %s", boot_stage_name(guard.previous_stage));
+	shell_print(sh, "previous boot reached: %s/%u", boot_stage_name(guard.previous_stage),
+		    guard.previous_detail);
+	if (guard.fault == BOOT_FAULT_KERNEL) {
+		shell_print(sh, "previous fault: kernel reason %u at pc 0x%08x", guard.fault_code,
+			    guard.fault_pc);
+	} else if (guard.fault != BOOT_FAULT_NONE) {
+		shell_print(sh, "previous fault: %s assertion %s:%u", boot_fault_name(guard.fault),
+			    guard.fault_file, guard.fault_code);
+	} else {
+		shell_print(sh, "previous fault: none recorded");
+	}
 	shell_print(sh, "consecutive watchdog resets: %u", guard.watchdog_resets);
 	shell_print(sh, "safe mode: %s", guard.safe_mode ? "yes (power-cycle to retry)" : "no");
 	shell_print(sh, "watchdog: %s, %u s", guard.watchdog_running ? "running" : "off",

@@ -5,6 +5,7 @@
 #include "bridge.h"
 #include "gamepad.h"
 #include "remote.h"
+#include "../boot_guard.h"
 
 #include <errno.h>
 #include <string.h>
@@ -78,6 +79,7 @@ int ble_bridge_start(void)
 	if (err) {
 		LOG_WRN("host modes not loaded (%d); defaults apply", err);
 	}
+	boot_guard_detail(7); /* bootguard detail 7: host modes loaded */
 	return 0;
 }
 

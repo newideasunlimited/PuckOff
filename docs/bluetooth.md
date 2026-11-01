@@ -19,7 +19,8 @@ Bluetooth takes are counted as deferred polls, exactly like the default image.
 
 ```sh
 west build --sysbuild -b promicro_nrf52840/nrf52840/uf2 \
-  -d build/ble-bridge firmware -- -DEXTRA_CONF_FILE=ble-bridge.conf
+  -d build/ble-bridge firmware -- -DEXTRA_CONF_FILE=ble-bridge.conf \
+  -DEXTRA_DTC_OVERLAY_FILE=ble-bridge.overlay
 ```
 
 ### 32 kHz clock
@@ -50,9 +51,16 @@ far the previous boot got:
 | `main`, `usb`, `bluetooth`, `radio` | **Safe mode**: USB gamepad and console only, Bluetooth and the controller radio off |
 | `kernel`, `bootloader`, or no record | Straight to the UF2 drive, with no watchdog |
 
-The `bootguard` console command prints the reset cause, the stage the previous
-boot reached, the streak of watchdog resets, and whether this boot is in safe
-mode. Safe mode ends with any non-watchdog reset, such as unplugging the board.
+The record lives in 128 bytes of RAM reserved by `ble-bridge.overlay`
+(`retained0`, 0x20000080) because the Adafruit bootloader runs on every reset
+and zeroes its own RAM from 0x20008000 up; a record inside the kernel's normal
+RAM did not survive the trip. Kernel fatal errors and MPSL / SoftDevice
+Controller assertions are written into the same record before the watchdog
+resets the board, so a crash is reported, not just a hang.
+
+The `bootguard` console command prints the reset cause, the stage and detail
+the previous boot reached, any recorded fault, the streak of watchdog resets,
+and whether this boot is in safe mode. Safe mode ends with any non-watchdog reset, such as unplugging the board.
 The nRF52840 watchdog cannot be stopped and keeps counting through a soft
 reset, so with the guard enabled the `bootloader` command stops feeding it and
 lets the watchdog perform the reset; the drive appears within the timeout, and

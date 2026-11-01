@@ -39,16 +39,19 @@ config PUCKOFF_USB_TEST_RECOVERY
 	  This application timer does not recover a board that cannot boot
 	  or whose kernel/workqueue stops running; retain physical reset access.
 
-# Pairing buffers must not be assigned when the standalone profile omits shell.
+# Pairing buffers and the shell stack apply to every image with the setup
+# console (generic USB and the BLE bridge), not to the standalone Switch profile.
+# setup status builds a 1 KB line on the shell thread; the Zephyr default stack
+# overflows there, which the boot guard reported as kernel fault 2.
 config SHELL_BACKEND_SERIAL_RX_RING_BUFFER_SIZE
 	default 256
-	depends on PUCKOFF_USB_GENERIC && SHELL && SHELL_BACKENDS && SHELL_BACKEND_SERIAL
+	depends on (PUCKOFF_USB_GENERIC || PUCKOFF_TRANSPORT_BLE_BRIDGE) && SHELL && SHELL_BACKENDS && SHELL_BACKEND_SERIAL
 	depends on SHELL_BACKEND_SERIAL_API_INTERRUPT_DRIVEN || SHELL_BACKEND_SERIAL_API_POLLING
 
 config SHELL_CMD_BUFF_SIZE
 	default 256
-	depends on PUCKOFF_USB_GENERIC && SHELL
+	depends on (PUCKOFF_USB_GENERIC || PUCKOFF_TRANSPORT_BLE_BRIDGE) && SHELL
 
 config SHELL_STACK_SIZE
 	default 3072
-	depends on PUCKOFF_USB_GENERIC && SHELL
+	depends on (PUCKOFF_USB_GENERIC || PUCKOFF_TRANSPORT_BLE_BRIDGE) && SHELL
