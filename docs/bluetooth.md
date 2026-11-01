@@ -1,5 +1,33 @@
 # Bluetooth transport groundwork
 
+## BLE bridge (experimental, needs hardware testing)
+
+`ble-bridge.conf` builds a receiver that sends Steam Controller input to a
+Bluetooth LE host. The controller link and Bluetooth share the radio: each
+controller exchange runs in its own MPSL timeslot (`src/radio_timeslot.c`),
+and the SoftDevice Controller keeps priority for its connection events. Slots
+Bluetooth takes are counted as deferred polls, exactly like the default image.
+
+- While a Bluetooth host is connected, input goes to it. Otherwise it goes to
+  the USB gamepad, so the same board still works plugged into a computer.
+- The board advertises as `PuckOff` and remembers up to four hosts. Use
+  `ble status` and `ble forget_hosts` in the serial console.
+- The USB serial console and the setup tool work as in the default image.
+- Pairing, security and the report format match the diagnostic below.
+- Expect added latency in Bluetooth mode. Neither latency nor reliability
+  next to an active Bluetooth connection has been measured on hardware yet.
+
+```sh
+west build --sysbuild -b promicro_nrf52840/nrf52840/uf2 \
+  -d build/ble-bridge firmware -- -DEXTRA_CONF_FILE=ble-bridge.conf
+```
+
+Hardware checklist for a first test: copy a pairing onto the board, confirm
+the controller still works over USB, then pair `PuckOff` from a TV or phone and
+check that buttons, sticks and triggers respond, the link survives 10 minutes
+of play, and input returns to USB after the Bluetooth host disconnects.
+
+
 The default image remains the USB gamepad with exclusive proprietary RF. The
 opt-in **BLE-only diagnostic** advertises `PuckOff BLE diagnostic` and implements
 an encrypted HID input service. It does **not** receive Steam Controller input,

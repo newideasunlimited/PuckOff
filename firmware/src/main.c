@@ -14,6 +14,9 @@
 #include "input.h"
 #include "link.h"
 #include "usb.h"
+#ifdef CONFIG_PUCKOFF_TRANSPORT_BLE_BRIDGE
+#include "ble/gamepad.h"
+#endif
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
@@ -21,6 +24,21 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 static int active_slot = -1;
 static atomic_t watch;
 static struct ctrl_state last_seen;
+
+/* With a Bluetooth host connected, input goes there instead of USB. */
+static void send_report(const struct gamepad_report *r)
+{
+#ifdef CONFIG_PUCKOFF_TRANSPORT_BLE_BRIDGE
+	struct ble_gamepad_status status;
+
+	ble_gamepad_get_status(&status);
+	if (status.connected) {
+		(void)ble_gamepad_update(r);
+		return;
+	}
+#endif
+	usb_send_gamepad(r);
+}
 
 void main_set_watch(bool on)
 {
@@ -37,7 +55,7 @@ static void on_input(int slot, const struct ctrl_state *st)
 	}
 	active_slot = slot;
 	gamepad_from_ctrl(st, &r);
-	usb_send_gamepad(&r);
+	send_report(&r);
 
 	if (atomic_get(&watch) && (st->buttons != last_seen.buttons ||
 		      abs(st->lx - last_seen.lx) > 2000 || abs(st->ly - last_seen.ly) > 2000 ||
@@ -55,7 +73,7 @@ static void on_lost(int slot)
 
 	if (slot == active_slot) {
 		gamepad_neutral(&r);
-		usb_send_gamepad(&r);
+		send_report(&r);
 		active_slot = -1;
 		last_seen = (struct ctrl_state){0};
 	}
@@ -87,6 +105,13 @@ int main(void)
 	if (storage_err) {
 		return storage_err;
 	}
+#ifdef CONFIG_PUCKOFF_TRANSPORT_BLE_BRIDGE
+	err = ble_gamepad_start();
+	if (err) {
+		LOG_ERR("bluetooth failed (%d)", err);
+		return err;
+	}
+#endif
 	err = link_start(on_input, on_lost);
 	if (err) {
 		LOG_ERR("radio startup failed (%d)", err);

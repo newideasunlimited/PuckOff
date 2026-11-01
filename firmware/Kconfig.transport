@@ -18,4 +18,12 @@ config PUCKOFF_TRANSPORT_BLE_DIAGNOSTIC
 	  diagnostic commands only. This is not a Steam Controller receiver.
 	  The raw radio driver and controller link are not compiled.
 
+config PUCKOFF_TRANSPORT_BLE_BRIDGE
+	bool "Controller to a Bluetooth LE gamepad, sharing the radio"
+	depends on SOC_NRF52840 && BT && BT_PERIPHERAL && BT_LL_SOFTDEVICE
+	help
+	  The controller link runs inside MPSL timeslots next to the SoftDevice
+	  Controller, and controller input goes to one connected BLE HID host.
+	  With no BLE host connected, input goes to the USB gamepad instead.
+
 endchoice

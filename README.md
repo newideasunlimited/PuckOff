@@ -17,7 +17,7 @@ a USB port alone does not imply compatibility.
 | Four stored bonds, one active controller | Implemented; not four simultaneous gamepads |
 | Xbox / PlayStation / Switch style modes    | Planned      |
 | Steam receiver mode (pairing from Steam)  | Planned      |
-| Bluetooth to TVs, phones, Apple TV        | Planned      |
+| Bluetooth to TVs, phones, Apple TV        | Experimental BLE bridge build; untested on hardware |
 | Copy a pairing to any number of boards    | Host-assisted setup |
 
 ## Hardware
