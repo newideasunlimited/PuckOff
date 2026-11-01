@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config PUCKOFF_BOOT_GUARD
+	bool "Watchdog boot guard with safe mode and UF2 fallback"
+	depends on SOC_NRF52840
+	select REBOOT
+	help
+	  Arm the hardware watchdog before the kernel starts and record how far
+	  each boot gets in retained RAM. After a watchdog reset, a boot that hung
+	  after main() comes up in safe mode (USB gamepad and console only), and
+	  a boot that hung before main() goes straight to the UF2 drive. The
+	  `bootloader` command then lets the watchdog perform the reset, so the
+	  drive never starts with a watchdog still counting. Intended for
+	  hardware-untested images; it does not modify the bootloader.
+
+config PUCKOFF_BOOT_GUARD_TIMEOUT_S
+	int "Watchdog timeout in seconds"
+	depends on PUCKOFF_BOOT_GUARD
+	range 2 60
+	default 10
+	help
+	  The watchdog is fed from the system work queue every quarter of this
+	  period. Entering the UF2 drive from the console takes up to this long.
+
+config PUCKOFF_BOOT_GUARD_MAX_RUNTIME_RESETS
+	int "Consecutive watchdog resets of a ready receiver before safe mode"
+	depends on PUCKOFF_BOOT_GUARD
+	range 1 20
+	default 3
+	help
+	  A receiver that was fully running restarts normally after a watchdog
+	  reset. After this many in a row without a clean boot in between, it
+	  starts in safe mode instead so the fault can be inspected.

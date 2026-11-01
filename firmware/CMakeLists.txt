@@ -50,3 +50,5 @@ elseif(CONFIG_PUCKOFF_TRANSPORT_BLE_BRIDGE)
 else()
 	message(FATAL_ERROR "Select exactly one PuckOff transport and radio owner.")
 endif()
+
+target_sources_ifdef(CONFIG_PUCKOFF_BOOT_GUARD app PRIVATE src/boot_guard.c)

@@ -22,6 +22,48 @@ west build --sysbuild -b promicro_nrf52840/nrf52840/uf2 \
   -d build/ble-bridge firmware -- -DEXTRA_CONF_FILE=ble-bridge.conf
 ```
 
+### 32 kHz clock
+
+The bridge selects the calibrated RC oscillator (`CONFIG_CLOCK_CONTROL_NRF_K32SRC_RC`)
+instead of the board default, an external 32.768 kHz crystal. Many Pro Micro
+nRF52840 clones have no such crystal. The default USB image still runs on them
+only because Zephyr's two-stage LFXO start keeps the RC oscillator running
+while it waits for a crystal that never arrives. The SoftDevice Controller
+waits for that crystal as well, so the first bridge image enumerated on USB
+and then stopped responding completely: no console, no advertising, no reset.
+The RC oscillator costs a little sleep-clock accuracy, which a USB-powered
+receiver can afford, and works on boards with or without the crystal.
+
+### Boot guard
+
+The bridge also enables `CONFIG_PUCKOFF_BOOT_GUARD` (`firmware/Kconfig.guard`,
+`src/boot_guard.c`). Before the kernel starts it arms the hardware watchdog
+(10 s by default) and records how far each boot gets in retained RAM. The
+system work queue feeds the watchdog, so a halted fatal error, a spin with
+interrupts locked or a wedged work queue all end in a watchdog reset instead
+of a dead board that still shows up on USB. What happens next depends on how
+far the previous boot got:
+
+| Previous boot reached | After a watchdog reset |
+|-----------------------|------------------------|
+| `ready` | Normal boot; safe mode after three in a row |
+| `main`, `usb`, `bluetooth`, `radio` | **Safe mode**: USB gamepad and console only, Bluetooth and the controller radio off |
+| `kernel`, `bootloader`, or no record | Straight to the UF2 drive, with no watchdog |
+
+The `bootguard` console command prints the reset cause, the stage the previous
+boot reached, the streak of watchdog resets, and whether this boot is in safe
+mode. Safe mode ends with any non-watchdog reset, such as unplugging the board.
+The nRF52840 watchdog cannot be stopped and keeps counting through a soft
+reset, so with the guard enabled the `bootloader` command stops feeding it and
+lets the watchdog perform the reset; the drive appears within the timeout, and
+the bootloader never starts with a watchdog still running. Nothing here
+modifies the bootloader: the guard uses the same retained GPREGRET value the
+`bootloader` command always used.
+
+The guard is off in the default USB image, whose UF2 is unchanged. Host tests
+in `tests/receiver/test_boot_guard.c` cover the policy, watchdog register
+setup, the feed, and both ways to reach the drive.
+
 Hardware checklist for a first test: copy a pairing onto the board, confirm
 the controller still works over USB, then pair `PuckOff` from a TV or phone and
 check that buttons, sticks and triggers respond, the link survives 10 minutes

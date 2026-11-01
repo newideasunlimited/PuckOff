@@ -8,7 +8,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 option(PUCKOFF_SANITIZERS "Enable address and undefined-behavior sanitizers" ON)
 
-foreach(name input link radio radio_timeslot main)
+foreach(name input link radio radio_timeslot main boot_guard)
   add_executable(test_${name} test_${name}.c fake_kernel.c)
   target_include_directories(test_${name} PRIVATE fakes ../../firmware/src)
   target_compile_definitions(test_${name} PRIVATE CONFIG_SYS_CLOCK_TICKS_PER_SEC=32768)

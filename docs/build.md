@@ -87,6 +87,13 @@ Rebooting into the UF2 bootloader can re-enumerate USB without mounting its
 mass-storage drive on macOS. Do not assume that seeing a bootloader USB device
 means a UF2 copy can proceed.
 
+An image with the [boot guard](bluetooth.md#boot-guard) enabled (the BLE
+bridge) recovers from a hung boot by itself: a watchdog reset brings it back
+in safe mode with the console available, or on the UF2 drive if it hung before
+`main()`. Run `bootguard` on the console to see why. A board that enumerates
+on USB but never answers its serial console, as the first bridge image did on
+boards without a 32 kHz crystal, needs a double-tap reset to the drive instead.
+
 The hardware owner recovered the tested board using Adafruit **serial DFU**
 over its verified bootloader CDC port. This requires a separately validated,
 application-only Intel HEX: every data address must be inside

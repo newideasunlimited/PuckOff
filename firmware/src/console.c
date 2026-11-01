@@ -7,8 +7,12 @@
 #include <zephyr/kernel.h>
 #include <zephyr/shell/shell.h>
 #include <zephyr/sys/reboot.h>
+#ifdef CONFIG_PUCKOFF_BOOT_GUARD
+#include <hal/nrf_power.h>
+#endif
 
 #include "bond.h"
+#include "boot_guard.h"
 #include "link.h"
 
 static bool parse_u32(const char *s, uint32_t *out)
@@ -165,12 +169,47 @@ SHELL_CMD_ARG_REGISTER(watch, NULL, "watch [on|off]: print controller input", cm
 
 static int cmd_bootloader(const struct shell *sh, size_t argc, char **argv)
 {
+#ifdef CONFIG_PUCKOFF_BOOT_GUARD
+	struct boot_guard_status guard;
+
+	boot_guard_get_status(&guard);
+	if (guard.watchdog_running) {
+		shell_print(sh, "letting the watchdog reset into the UF2 drive; up to %u s",
+			    guard.timeout_s);
+	}
+	(void)boot_guard_request_bootloader();
+	for (;;) {
+		k_sleep(K_FOREVER);
+	}
+#else
 	/* Magic value the Adafruit UF2 bootloader checks to stay in DFU mode. */
 	NRF_POWER->GPREGRET = 0x57;
 	sys_reboot(SYS_REBOOT_COLD);
+#endif
 	return 0;
 }
 SHELL_CMD_REGISTER(bootloader, NULL, "Reboot into the UF2 drive for flashing", cmd_bootloader);
+
+#ifdef CONFIG_PUCKOFF_BOOT_GUARD
+static int cmd_bootguard(const struct shell *sh, size_t argc, char **argv)
+{
+	struct boot_guard_status guard;
+
+	boot_guard_get_status(&guard);
+	shell_print(sh, "reset cause 0x%08x%s%s%s%s", guard.reset_cause,
+		    (guard.reset_cause & NRF_POWER_RESETREAS_RESETPIN_MASK) ? " pin" : "",
+		    (guard.reset_cause & NRF_POWER_RESETREAS_DOG_MASK) ? " watchdog" : "",
+		    (guard.reset_cause & NRF_POWER_RESETREAS_SREQ_MASK) ? " soft" : "",
+		    (guard.reset_cause & NRF_POWER_RESETREAS_LOCKUP_MASK) ? " lockup" : "");
+	shell_print(sh, "previous boot reached: %s", boot_stage_name(guard.previous_stage));
+	shell_print(sh, "consecutive watchdog resets: %u", guard.watchdog_resets);
+	shell_print(sh, "safe mode: %s", guard.safe_mode ? "yes (power-cycle to retry)" : "no");
+	shell_print(sh, "watchdog: %s, %u s", guard.watchdog_running ? "running" : "off",
+		    guard.timeout_s);
+	return 0;
+}
+SHELL_CMD_REGISTER(bootguard, NULL, "Watchdog boot guard status", cmd_bootguard);
+#endif
 
 /*
  * One bounded line per response; request ids distinguish responses from shell

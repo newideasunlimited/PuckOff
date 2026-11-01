@@ -47,3 +47,20 @@ k_tid_t k_thread_create(struct k_thread *thread, void *stack, size_t size,
 		       int priority, uint32_t options, int delay);
 int k_thread_name_set(struct k_thread *thread, const char *name);
 int printk(const char *format, ...);
+
+#define K_FOREVER (-1)
+#define K_MSEC(ms) ((int)(ms))
+#define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
+#define BUILD_ASSERT(condition, ...) _Static_assert(condition, "" __VA_ARGS__)
+
+struct k_work { int unused; };
+struct k_work_delayable {
+	void (*handler)(struct k_work *work);
+	bool scheduled;
+	int delay;
+};
+#define K_WORK_DELAYABLE_DEFINE(name, fn) struct k_work_delayable name = { fn, false, 0 }
+int k_work_schedule(struct k_work_delayable *work, int delay);
+int k_work_reschedule(struct k_work_delayable *work, int delay);
+int k_work_cancel_delayable(struct k_work_delayable *work);
+void k_sleep(int timeout);

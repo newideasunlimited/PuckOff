@@ -60,3 +60,16 @@ int gpio_pin_set_dt(const struct gpio_dt_spec *gpio, int value)
 {
 	(void)gpio; (void)value; return test_led_write_error;
 }
+int k_work_schedule(struct k_work_delayable *work, int delay)
+{
+	work->scheduled = true; work->delay = delay; return 1;
+}
+int k_work_reschedule(struct k_work_delayable *work, int delay)
+{
+	return k_work_schedule(work, delay);
+}
+int k_work_cancel_delayable(struct k_work_delayable *work)
+{
+	work->scheduled = false; return 0;
+}
+void k_sleep(int timeout) { (void)timeout; }

@@ -3,4 +3,5 @@ mainmenu "PuckOff firmware"
 
 rsource "Kconfig.transport"
 rsource "Kconfig.usb"
+rsource "Kconfig.guard"
 source "Kconfig.zephyr"

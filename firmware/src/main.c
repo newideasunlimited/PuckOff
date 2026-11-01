@@ -10,6 +10,7 @@
 #include <zephyr/sys/atomic.h>
 
 #include "bond.h"
+#include "boot_guard.h"
 #include "gamepad.h"
 #include "input.h"
 #include "link.h"
@@ -84,6 +85,7 @@ int main(void)
 	int err;
 	bool have_led = gpio_is_ready_dt(&led);
 
+	boot_guard_stage(BOOT_STAGE_MAIN);
 	if (have_led) {
 		err = gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
 		if (err) {
@@ -102,22 +104,31 @@ int main(void)
 		LOG_ERR("usb failed (%d)", err);
 		return err;
 	}
+	boot_guard_stage(BOOT_STAGE_USB);
 	if (storage_err) {
 		return storage_err;
 	}
+	if (boot_guard_safe_mode()) {
+		/* USB and the console are enough to read bootguard and reflash. */
+		LOG_WRN("safe mode: not starting Bluetooth or the controller radio");
+	} else {
 #ifdef CONFIG_PUCKOFF_TRANSPORT_BLE_BRIDGE
-	err = ble_gamepad_start();
-	if (err) {
-		LOG_ERR("bluetooth failed (%d)", err);
-		return err;
-	}
+		boot_guard_stage(BOOT_STAGE_BLUETOOTH);
+		err = ble_gamepad_start();
+		if (err) {
+			LOG_ERR("bluetooth failed (%d)", err);
+			return err;
+		}
 #endif
-	err = link_start(on_input, on_lost);
-	if (err) {
-		LOG_ERR("radio startup failed (%d)", err);
-		return err;
+		boot_guard_stage(BOOT_STAGE_RADIO);
+		err = link_start(on_input, on_lost);
+		if (err) {
+			LOG_ERR("radio startup failed (%d)", err);
+			return err;
+		}
+		boot_guard_stage(BOOT_STAGE_READY);
+		LOG_INF("PuckOff ready");
 	}
-	LOG_INF("PuckOff ready");
 
 	/* LED: slow blink = searching, solid = connected, fast blink = not paired. */
 	for (uint32_t t = 0;; t++) {
