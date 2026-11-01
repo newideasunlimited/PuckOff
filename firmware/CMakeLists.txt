@@ -43,8 +43,12 @@ elseif(CONFIG_PUCKOFF_TRANSPORT_BLE_BRIDGE)
 		src/input.c
 		src/usb.c
 		src/console.c
+		src/ble/bridge.c
 		src/ble/bridge_shell.c
 		src/ble/gamepad.c
+		src/ble/hid_map.c
+		src/ble/modes.c
+		src/ble/remote.c
 		src/ble/report_state.c
 	)
 else()

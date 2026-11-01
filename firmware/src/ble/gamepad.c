@@ -1,8 +1,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /*
+ * BLE HID transport: one host, four input reports (gamepad, keyboard, mouse,
+ * consumer control) behind the same encrypted HID service.
  * Copyright 2026 New Ideas Unlimited, LLC and the PuckOff contributors.
  */
 #include "gamepad.h"
+#include "hid_map.h"
 #include "report_state.h"
 
 #include <errno.h>
@@ -20,9 +23,10 @@ LOG_MODULE_REGISTER(ble_gamepad, LOG_LEVEL_INF);
 
 BUILD_ASSERT(CONFIG_BT_MAX_CONN == 1, "BLE report gates require exactly one host");
 BUILD_ASSERT(sizeof(struct gamepad_report) == BLE_GAMEPAD_REPORT_SIZE);
+BUILD_ASSERT(BLE_HID_REPORT_ID_GAMEPAD == BLE_REPORT_GAMEPAD + 1);
+BUILD_ASSERT(BLE_HID_REPORT_ID_CONSUMER == BLE_REPORT_CONSUMER + 1);
 
 #define REPORT_INTERVAL_MS 8
-#define INPUT_REPORT_ATTR 6
 
 static K_MUTEX_DEFINE(state_lock);
 static struct ble_report_state state;
@@ -30,11 +34,22 @@ static struct ble_gamepad_status counters;
 static struct bt_conn *host;
 static bool started;
 static int last_tx_error;
+/* Value attributes of the four Report characteristics, found at start. */
+static const struct bt_gatt_attr *report_attr[BLE_REPORT_COUNT];
 
 static void report_work_handler(struct k_work *work);
 static void advertise_work_handler(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(report_work, report_work_handler);
 static K_WORK_DELAYABLE_DEFINE(advertise_work, advertise_work_handler);
+
+static const uint8_t report_ids[BLE_REPORT_COUNT] = {
+	BLE_REPORT_GAMEPAD, BLE_REPORT_KEYBOARD, BLE_REPORT_MOUSE, BLE_REPORT_CONSUMER,
+};
+/* Report Reference descriptors: HID report ID, type 1 (input). */
+static const uint8_t references[BLE_REPORT_COUNT][2] = {
+	{ BLE_HID_REPORT_ID_GAMEPAD, 1 }, { BLE_HID_REPORT_ID_KEYBOARD, 1 },
+	{ BLE_HID_REPORT_ID_MOUSE, 1 }, { BLE_HID_REPORT_ID_CONSUMER, 1 },
+};
 
 static ssize_t read_information(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 				void *buf, uint16_t len, uint16_t offset)
@@ -48,37 +63,57 @@ static ssize_t read_information(struct bt_conn *conn, const struct bt_gatt_attr 
 static ssize_t read_map(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
 			uint16_t len, uint16_t offset)
 {
-	return bt_gatt_attr_read(conn, attr, buf, len, offset, gamepad_hid_desc,
-				 gamepad_hid_desc_len);
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, ble_hid_map, ble_hid_map_len);
 }
 
 static ssize_t read_report(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
 			   uint16_t len, uint16_t offset)
 {
-	uint8_t report[BLE_GAMEPAD_REPORT_SIZE];
+	enum ble_report_id id = *(const uint8_t *)attr->user_data;
+	uint8_t report[BLE_REPORT_MAX];
 
 	k_mutex_lock(&state_lock, K_FOREVER);
-	memcpy(report, state.report, sizeof(report));
+	memcpy(report, state.report[id].data, sizeof(report));
 	k_mutex_unlock(&state_lock);
-	return bt_gatt_attr_read(conn, attr, buf, len, offset, report, sizeof(report));
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, report, ble_report_size(id));
 }
 
 static ssize_t read_reference(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 			      void *buf, uint16_t len, uint16_t offset)
 {
-	/* The shared report map has no Report ID item; input report ID is zero. */
-	static const uint8_t reference[] = { 0, 1 };
-
-	return bt_gatt_attr_read(conn, attr, buf, len, offset, reference, sizeof(reference));
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, attr->user_data, 2);
 }
 
-static void subscription_changed(const struct bt_gatt_attr *attr, uint16_t value)
+static void subscription_changed(enum ble_report_id id, uint16_t value)
 {
-	ARG_UNUSED(attr);
 	k_mutex_lock(&state_lock, K_FOREVER);
-	ble_report_gate_set(&state, BLE_REPORT_SUBSCRIBED, value == BT_GATT_CCC_NOTIFY);
+	ble_report_subscribe(&state, id, value == BT_GATT_CCC_NOTIFY);
 	k_mutex_unlock(&state_lock);
 	k_work_schedule(&report_work, K_MSEC(REPORT_INTERVAL_MS));
+}
+
+static void gamepad_ccc(const struct bt_gatt_attr *attr, uint16_t value)
+{
+	ARG_UNUSED(attr);
+	subscription_changed(BLE_REPORT_GAMEPAD, value);
+}
+
+static void keyboard_ccc(const struct bt_gatt_attr *attr, uint16_t value)
+{
+	ARG_UNUSED(attr);
+	subscription_changed(BLE_REPORT_KEYBOARD, value);
+}
+
+static void mouse_ccc(const struct bt_gatt_attr *attr, uint16_t value)
+{
+	ARG_UNUSED(attr);
+	subscription_changed(BLE_REPORT_MOUSE, value);
+}
+
+static void consumer_ccc(const struct bt_gatt_attr *attr, uint16_t value)
+{
+	ARG_UNUSED(attr);
+	subscription_changed(BLE_REPORT_CONSUMER, value);
 }
 
 static ssize_t write_control(struct bt_conn *conn, const struct bt_gatt_attr *attr,
@@ -105,57 +140,91 @@ static ssize_t write_control(struct bt_conn *conn, const struct bt_gatt_attr *at
 	return len;
 }
 
+#define INPUT_REPORT(_id, _ccc)                                                              \
+	BT_GATT_CHARACTERISTIC(BT_UUID_HIDS_REPORT, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,       \
+			       BT_GATT_PERM_READ_ENCRYPT, read_report, NULL,                       \
+			       (void *)&report_ids[_id]),                                          \
+	BT_GATT_CCC(_ccc, BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT),                \
+	BT_GATT_DESCRIPTOR(BT_UUID_HIDS_REPORT_REF, BT_GATT_PERM_READ_ENCRYPT, read_reference,    \
+			   NULL, (void *)references[_id])
+
 BT_GATT_SERVICE_DEFINE(gamepad_service,
 	BT_GATT_PRIMARY_SERVICE(BT_UUID_HIDS),
 	BT_GATT_CHARACTERISTIC(BT_UUID_HIDS_INFO, BT_GATT_CHRC_READ,
 			       BT_GATT_PERM_READ_ENCRYPT, read_information, NULL, NULL),
 	BT_GATT_CHARACTERISTIC(BT_UUID_HIDS_REPORT_MAP, BT_GATT_CHRC_READ,
 			       BT_GATT_PERM_READ_ENCRYPT, read_map, NULL, NULL),
-	BT_GATT_CHARACTERISTIC(BT_UUID_HIDS_REPORT, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
-			       BT_GATT_PERM_READ_ENCRYPT, read_report, NULL, NULL),
-	BT_GATT_CCC(subscription_changed, BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT),
-	BT_GATT_DESCRIPTOR(BT_UUID_HIDS_REPORT_REF, BT_GATT_PERM_READ_ENCRYPT,
-			   read_reference, NULL, NULL),
+	INPUT_REPORT(BLE_REPORT_GAMEPAD, gamepad_ccc),
+	INPUT_REPORT(BLE_REPORT_KEYBOARD, keyboard_ccc),
+	INPUT_REPORT(BLE_REPORT_MOUSE, mouse_ccc),
+	INPUT_REPORT(BLE_REPORT_CONSUMER, consumer_ccc),
 	BT_GATT_CHARACTERISTIC(BT_UUID_HIDS_CTRL_POINT, BT_GATT_CHRC_WRITE_WITHOUT_RESP,
 			       BT_GATT_PERM_WRITE_ENCRYPT, NULL, write_control, NULL)
 );
 
+static int find_report_attributes(void)
+{
+	int found = 0;
+
+	for (size_t i = 0; i < gamepad_service.attr_count; i++) {
+		const struct bt_gatt_attr *attr = &gamepad_service.attrs[i];
+
+		if (bt_uuid_cmp(attr->uuid, BT_UUID_HIDS_REPORT) != 0) {
+			continue;
+		}
+		if (found == BLE_REPORT_COUNT || attr->user_data != &report_ids[found]) {
+			return -EINVAL;
+		}
+		report_attr[found++] = attr;
+	}
+	return found == BLE_REPORT_COUNT ? 0 : -EINVAL;
+}
+
+/* Bonded hosts keep their CCC values across reconnects without writing them again. */
+static void resync_subscriptions(void)
+{
+	for (int i = 0; i < BLE_REPORT_COUNT; i++) {
+		bool subscribed = bt_gatt_is_subscribed(host, report_attr[i], BT_GATT_CCC_NOTIFY);
+
+		if (subscribed != state.report[i].subscribed) {
+			ble_report_subscribe(&state, (enum ble_report_id)i, subscribed);
+		}
+	}
+}
+
 static void report_work_handler(struct k_work *work)
 {
-	int err;
+	int err = 0;
+	int id;
 
 	ARG_UNUSED(work);
 	k_mutex_lock(&state_lock, K_FOREVER);
-	if (host) {
-		bool subscribed = bt_gatt_is_subscribed(host,
-						       &gamepad_service.attrs[INPUT_REPORT_ATTR],
-						       BT_GATT_CCC_NOTIFY);
-
-		if (subscribed != ((state.gates & BLE_REPORT_SUBSCRIBED) != 0)) {
-			ble_report_gate_set(&state, BLE_REPORT_SUBSCRIBED, subscribed);
-		}
-	}
-	if (!host || !ble_report_ready(&state)) {
+	if (!host) {
 		k_mutex_unlock(&state_lock);
 		return;
 	}
-	struct bt_gatt_notify_params params = {
-		.attr = &gamepad_service.attrs[INPUT_REPORT_ATTR],
-		.data = state.report,
-		.len = sizeof(state.report),
-	};
+	resync_subscriptions();
+	while ((id = ble_report_next(&state)) >= 0) {
+		struct bt_gatt_notify_params params = {
+			.attr = report_attr[id],
+			.data = state.report[id].data,
+			.len = ble_report_size((enum ble_report_id)id),
+		};
 
-	/* On the system workqueue this returns -ENOMEM rather than waiting for ATT
-	 * buffers. The stack copies the bytes; at most one newest report is staged.
-	 */
-	err = bt_gatt_notify_cb(host, &params);
-	if (!err) {
-		state.pending = false;
+		/* On the system workqueue this returns -ENOMEM rather than waiting for
+		 * ATT buffers. The stack copies the bytes; only the newest state is staged.
+		 */
+		err = bt_gatt_notify_cb(host, &params);
+		if (err) {
+			break;
+		}
+		ble_report_sent(&state, (enum ble_report_id)id);
 		counters.submitted++;
 		last_tx_error = 0;
-	} else if (err == -ENOMEM || err == -EAGAIN) {
+	}
+	if (err == -ENOMEM || err == -EAGAIN) {
 		counters.backpressure++;
-	} else {
+	} else if (err) {
 		counters.failures++;
 		if (err != last_tx_error) {
 			LOG_WRN("HID notification failed (%d)", err);
@@ -276,6 +345,11 @@ int ble_gamepad_start(void)
 	if (started) {
 		return -EALREADY;
 	}
+	err = find_report_attributes();
+	if (err) {
+		LOG_ERR("HID service layout mismatch");
+		return err;
+	}
 	ble_report_reset(&state);
 	err = settings_subsys_init();
 	if (err) {
@@ -309,24 +383,59 @@ int ble_gamepad_update(const struct gamepad_report *report)
 		LOG_ERR("Invalid gamepad hat (%u)", report->hat);
 		return -EINVAL;
 	}
-	sys_put_le16(report->buttons, encoded);
-	encoded[2] = report->hat;
-	sys_put_le16((uint16_t)report->lx, &encoded[3]);
-	sys_put_le16((uint16_t)report->ly, &encoded[5]);
-	sys_put_le16((uint16_t)report->rx, &encoded[7]);
-	sys_put_le16((uint16_t)report->ry, &encoded[9]);
-	encoded[11] = report->lt;
-	encoded[12] = report->rt;
+	gamepad_encode_generic(report, encoded);
 
 	k_mutex_lock(&state_lock, K_FOREVER);
 	if (!started) {
 		k_mutex_unlock(&state_lock);
 		return -EAGAIN;
 	}
-	ble_report_update(&state, encoded);
+	ble_report_update(&state, BLE_REPORT_GAMEPAD, encoded);
 	k_mutex_unlock(&state_lock);
 	k_work_schedule(&report_work, K_MSEC(REPORT_INTERVAL_MS));
 	return 0;
+}
+
+int ble_gamepad_update_remote(const struct remote_report *report)
+{
+	if (!report) {
+		return -EINVAL;
+	}
+	k_mutex_lock(&state_lock, K_FOREVER);
+	if (!started) {
+		k_mutex_unlock(&state_lock);
+		return -EAGAIN;
+	}
+	ble_report_update(&state, BLE_REPORT_KEYBOARD, report->keyboard);
+	ble_report_move(&state, report->mouse_buttons, report->dx, report->dy, report->wheel);
+	ble_report_update(&state, BLE_REPORT_CONSUMER, report->consumer);
+	k_mutex_unlock(&state_lock);
+	k_work_schedule(&report_work, K_MSEC(REPORT_INTERVAL_MS));
+	return 0;
+}
+
+void ble_gamepad_neutral(void)
+{
+	k_mutex_lock(&state_lock, K_FOREVER);
+	ble_report_neutral(&state);
+	k_mutex_unlock(&state_lock);
+	k_work_schedule(&report_work, K_MSEC(REPORT_INTERVAL_MS));
+}
+
+bool ble_gamepad_host_peer(uint8_t peer[BLE_PEER_LEN])
+{
+	const bt_addr_le_t *addr;
+
+	k_mutex_lock(&state_lock, K_FOREVER);
+	if (!host || !(state.gates & BLE_REPORT_ENCRYPTED)) {
+		k_mutex_unlock(&state_lock);
+		return false;
+	}
+	addr = bt_conn_get_dst(host);
+	peer[0] = addr->type;
+	memcpy(peer + 1, addr->a.val, sizeof(addr->a.val));
+	k_mutex_unlock(&state_lock);
+	return true;
 }
 
 void ble_gamepad_get_status(struct ble_gamepad_status *status)
@@ -335,7 +444,7 @@ void ble_gamepad_get_status(struct ble_gamepad_status *status)
 	*status = counters;
 	status->connected = (state.gates & BLE_REPORT_CONNECTED) != 0;
 	status->encrypted = (state.gates & BLE_REPORT_ENCRYPTED) != 0;
-	status->subscribed = (state.gates & BLE_REPORT_SUBSCRIBED) != 0;
+	status->subscribed = state.report[BLE_REPORT_GAMEPAD].subscribed;
 	status->suspended = (state.gates & BLE_REPORT_SUSPENDED) != 0;
 	k_mutex_unlock(&state_lock);
 }

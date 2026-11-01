@@ -16,7 +16,7 @@
 #include "link.h"
 #include "usb.h"
 #ifdef CONFIG_PUCKOFF_TRANSPORT_BLE_BRIDGE
-#include "ble/gamepad.h"
+#include "ble/bridge.h"
 #endif
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
@@ -27,18 +27,29 @@ static atomic_t watch;
 static struct ctrl_state last_seen;
 
 /* With a Bluetooth host connected, input goes there instead of USB. */
-static void send_report(const struct gamepad_report *r)
+static void send_report(const struct ctrl_state *st, const struct gamepad_report *r)
 {
 #ifdef CONFIG_PUCKOFF_TRANSPORT_BLE_BRIDGE
-	struct ble_gamepad_status status;
+	if (ble_bridge_input(st, r)) {
+		return;
+	}
+#else
+	ARG_UNUSED(st);
+#endif
+	usb_send_gamepad(r);
+}
 
-	ble_gamepad_get_status(&status);
-	if (status.connected) {
-		(void)ble_gamepad_update(r);
+static void send_neutral(void)
+{
+	struct gamepad_report r;
+
+#ifdef CONFIG_PUCKOFF_TRANSPORT_BLE_BRIDGE
+	if (ble_bridge_lost()) {
 		return;
 	}
 #endif
-	usb_send_gamepad(r);
+	gamepad_neutral(&r);
+	usb_send_gamepad(&r);
 }
 
 void main_set_watch(bool on)
@@ -56,7 +67,7 @@ static void on_input(int slot, const struct ctrl_state *st)
 	}
 	active_slot = slot;
 	gamepad_from_ctrl(st, &r);
-	send_report(&r);
+	send_report(st, &r);
 
 	if (atomic_get(&watch) && (st->buttons != last_seen.buttons ||
 		      abs(st->lx - last_seen.lx) > 2000 || abs(st->ly - last_seen.ly) > 2000 ||
@@ -70,11 +81,8 @@ static void on_input(int slot, const struct ctrl_state *st)
 
 static void on_lost(int slot)
 {
-	struct gamepad_report r;
-
 	if (slot == active_slot) {
-		gamepad_neutral(&r);
-		send_report(&r);
+		send_neutral();
 		active_slot = -1;
 		last_seen = (struct ctrl_state){0};
 	}
@@ -114,7 +122,7 @@ int main(void)
 	} else {
 #ifdef CONFIG_PUCKOFF_TRANSPORT_BLE_BRIDGE
 		boot_guard_stage(BOOT_STAGE_BLUETOOTH);
-		err = ble_gamepad_start();
+		err = ble_bridge_start();
 		if (err) {
 			LOG_ERR("bluetooth failed (%d)", err);
 			return err;

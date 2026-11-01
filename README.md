@@ -23,7 +23,7 @@ used on redistributed, sold, or manufactured devices. See
 | Wired Switch / Pokken-style USB HID      | Implemented, opt-in; hardware validation pending |
 | Xbox / PlayStation console support       | Not implemented; no authentication support |
 | Steam receiver mode (pairing from Steam)  | Planned      |
-| Bluetooth to TVs, phones, Apple TV        | Experimental BLE bridge build; untested on hardware |
+| Bluetooth to TVs, phones, Apple TV        | Experimental BLE bridge build with gamepad and TV-remote modes; hardware test in progress |
 | Copy a pairing to any number of boards    | Host-assisted setup |
 
 ## Hardware

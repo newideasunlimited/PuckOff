@@ -42,6 +42,9 @@ jobs:
           cmake -S tests/receiver -B build/receiver-tests -G Ninja
           cmake --build build/receiver-tests
           ctest --test-dir build/receiver-tests --output-on-failure
+          cmake -S firmware/tests/ble -B build/ble-tests -G Ninja
+          cmake --build build/ble-tests
+          ctest --test-dir build/ble-tests --output-on-failure
           python3 -m unittest discover -s ci -p 'test_*.py'
 
   uf2:

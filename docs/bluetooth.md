@@ -64,6 +64,49 @@ The guard is off in the default USB image, whose UF2 is unchanged. Host tests
 in `tests/receiver/test_boot_guard.c` cover the policy, watchdog register
 setup, the feed, and both ways to reach the drive.
 
+### TV remote mode
+
+The same board can act as a TV remote instead of a gamepad. The BLE HID
+report map (`src/ble/hid_map.c`) is a composite of four input reports: the USB
+gamepad report under Report ID 1, a keyboard (ID 2), a relative mouse (ID 3)
+and a consumer control with two usages (ID 4). All four are always present, so
+a host never has to re-pair when the mode changes; the mode decides which
+reports carry input and the others stay released.
+
+| Controller | Remote mode sends |
+|------------|-------------------|
+| D-pad, left stick | Arrow keys |
+| A | Enter |
+| B | AC Back (Android/Fire TV profile) or Escape (Apple profile) |
+| X | Play/Pause |
+| Y | Mute |
+| Steam | AC Home |
+| Menu | Menu |
+| View | AC Search |
+| LB / RB | Previous / next track |
+| Left / right trigger (half travel or click) | Volume down / up |
+| Right trackpad | Pointer (about 1000 counts per swipe); click = left button |
+| Right stick | Pointer, speed by deflection |
+| Left trackpad, vertical | Scroll wheel; click = right button |
+
+The consumer report carries two usages at a time, volume first. The mapping
+lives in `src/ble/remote.c` as pure functions with host tests
+(`firmware/tests/ble/remote_test.c`); pointer motion accumulates between
+Bluetooth reports instead of being coalesced, so a steady swipe is not lost.
+
+The mode is remembered **per host** (`src/ble/modes.c`, four hosts, stored
+under the `puckoff/ble_modes` setting): a TV can stay a remote while a phone
+stays a gamepad. Unknown hosts get the gamepad. To switch, either hold
+**Steam + Menu for two seconds** on the controller (the chord itself is not
+forwarded) or type `ble mode remote` / `ble mode gamepad` on the console while
+the host is connected. `ble remote apple` makes B send Escape for Apple TV
+style hosts. `ble status` shows the active mode, and `ble forget_hosts` clears
+the remembered modes with the host bonds.
+
+Whether a given TV accepts a composite HID device, maps AC Home/AC Back the
+way its own remote does, or shows a pointer for the mouse report has to be
+observed on that TV; none of it is implied by the descriptor.
+
 Hardware checklist for a first test: copy a pairing onto the board, confirm
 the controller still works over USB, then pair `PuckOff` from a TV or phone and
 check that buttons, sticks and triggers respond, the link survives 10 minutes
