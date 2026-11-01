@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: Apache-2.0
+
+choice PUCKOFF_USB_MODE
+	prompt "USB gamepad profile"
+	depends on USB_DEVICE_STACK_NEXT && PUCKOFF_TRANSPORT_USB_RAW_RF
+	default PUCKOFF_USB_GENERIC
+
+config PUCKOFF_USB_GENERIC
+	bool "Generic HID gamepad (default)"
+	help
+	  PuckOff's 13-byte HID input report with analog triggers and a serial
+	  setup console. Host and game compatibility must be tested separately.
+	  The current 1209:0001 identity is reserved for private testing, is not
+	  unique, and must not be used on redistributed, sold, or manufactured
+	  devices. Allocate a product identity before distributing hardware.
+
+config PUCKOFF_USB_SWITCH
+	bool "Experimental wired Switch / Pokken-style HID"
+	depends on !USBD_CDC_ACM_CLASS
+	help
+	  Opt-in, single-interface USB HID profile with 8-byte input/output
+	  reports and digital triggers. Requires modes/switch.conf and
+	  modes/switch.overlay together. No serial console, rumble, IMU,
+	  capture button, or Xbox/PlayStation console authentication.
+	  Uses a third-party USB identity for interoperability experiments;
+	  not an allocated PuckOff product ID or a hardware-verified claim.
+
+endchoice
+
+config PUCKOFF_USB_TEST_RECOVERY
+	bool "DEVELOPMENT ONLY: return to UF2 after 120 seconds"
+	depends on PUCKOFF_USB_SWITCH && BOARD_PROMICRO_NRF52840_NRF52840_UF2
+	select REBOOT
+	help
+	  For an unattended USB experiment, reboot to the Adafruit UF2
+	  bootloader 120 seconds after usb_start(), without a serial console
+	  or host command. This requires the same bootloader as the existing
+	  console bootloader command. Never enable in a normal playing image.
+	  This application timer does not recover a board that cannot boot
+	  or whose kernel/workqueue stops running; retain physical reset access.
+
+# Pairing buffers must not be assigned when the standalone profile omits shell.
+config SHELL_BACKEND_SERIAL_RX_RING_BUFFER_SIZE
+	default 256
+	depends on PUCKOFF_USB_GENERIC && SHELL && SHELL_BACKENDS && SHELL_BACKEND_SERIAL
+	depends on SHELL_BACKEND_SERIAL_API_INTERRUPT_DRIVEN || SHELL_BACKEND_SERIAL_API_POLLING
+
+config SHELL_CMD_BUFF_SIZE
+	default 256
+	depends on PUCKOFF_USB_GENERIC && SHELL
+
+config SHELL_STACK_SIZE
+	default 3072
+	depends on PUCKOFF_USB_GENERIC && SHELL
