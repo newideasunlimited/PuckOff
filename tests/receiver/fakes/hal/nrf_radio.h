@@ -9,6 +9,7 @@ typedef struct {
 	volatile uint32_t MODE, MODECNF0, TXPOWER, FREQUENCY, PCNF0, PCNF1;
 	volatile uint32_t CRCCNF, CRCPOLY, CRCINIT, BASE0, PREFIX0;
 	volatile uint32_t TXADDRESS, RXADDRESSES, PACKETPTR, CRCSTATUS, RSSISAMPLE;
+	volatile uint32_t INTENSET, EVENTS_ADDRESS;
 } NRF_RADIO_Type;
 extern NRF_RADIO_Type test_radio;
 #define NRF_RADIO (&test_radio)
@@ -31,3 +32,4 @@ extern NRF_RADIO_Type test_radio;
 #define RADIO_SHORTS_END_DISABLE_Msk (1U << 1)
 #define RADIO_SHORTS_ADDRESS_RSSISTART_Msk (1U << 4)
 #define RADIO_SHORTS_DISABLED_RSSISTOP_Msk (1U << 8)
+#define RADIO_INTENSET_DISABLED_Msk (1U << 4)

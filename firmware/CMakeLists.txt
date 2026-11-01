@@ -30,6 +30,22 @@ elseif(CONFIG_PUCKOFF_TRANSPORT_BLE_DIAGNOSTIC)
 		src/ble/gamepad.c
 		src/ble/report_state.c
 	)
+elseif(CONFIG_PUCKOFF_TRANSPORT_BLE_BRIDGE)
+	if(CONFIG_MPSL_TIMESLOT_SESSION_COUNT LESS 1)
+		message(FATAL_ERROR "The BLE bridge needs one MPSL timeslot session.")
+	endif()
+	target_sources(app PRIVATE
+		src/main.c
+		src/radio_timeslot.c
+		src/link.c
+		src/bond.c
+		src/input.c
+		src/usb.c
+		src/console.c
+		src/ble/bridge_shell.c
+		src/ble/gamepad.c
+		src/ble/report_state.c
+	)
 else()
 	message(FATAL_ERROR "Select exactly one PuckOff transport and radio owner.")
 endif()

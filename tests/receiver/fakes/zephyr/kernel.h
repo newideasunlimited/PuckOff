@@ -39,6 +39,8 @@ static inline uint64_t k_ticks_to_us_floor64(uint64_t ticks)
 {
 	return ticks * 1000000U / CONFIG_SYS_CLOCK_TICKS_PER_SEC;
 }
+static inline void k_sched_lock(void) {}
+static inline void k_sched_unlock(void) {}
 void k_msleep(uint32_t ms);
 void k_usleep(uint32_t us);
 k_tid_t k_thread_create(struct k_thread *thread, void *stack, size_t size,
