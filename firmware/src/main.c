@@ -13,7 +13,11 @@
 #include "gamepad.h"
 #include "input.h"
 #include "link.h"
+#if defined(CONFIG_PUCKOFF_TRANSPORT_BLE_RF)
+#include "ble/gamepad.h"
+#else
 #include "usb.h"
+#endif
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
@@ -21,6 +25,19 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 static int active_slot = -1;
 static atomic_t watch;
 static struct ctrl_state last_seen;
+
+static void send_gamepad(const struct gamepad_report *report)
+{
+#if defined(CONFIG_PUCKOFF_TRANSPORT_BLE_RF)
+	int err = ble_gamepad_update(report);
+
+	if (err) {
+		LOG_ERR_RATELIMIT("BLE gamepad update failed (%d)", err);
+	}
+#else
+	usb_send_gamepad(report);
+#endif
+}
 
 void main_set_watch(bool on)
 {
@@ -37,7 +54,7 @@ static void on_input(int slot, const struct ctrl_state *st)
 	}
 	active_slot = slot;
 	gamepad_from_ctrl(st, &r);
-	usb_send_gamepad(&r);
+	send_gamepad(&r);
 
 	if (atomic_get(&watch) && (st->buttons != last_seen.buttons ||
 		      abs(st->lx - last_seen.lx) > 2000 || abs(st->ly - last_seen.ly) > 2000 ||
@@ -55,7 +72,7 @@ static void on_lost(int slot)
 
 	if (slot == active_slot) {
 		gamepad_neutral(&r);
-		usb_send_gamepad(&r);
+		send_gamepad(&r);
 		active_slot = -1;
 		last_seen = (struct ctrl_state){0};
 	}
@@ -79,9 +96,17 @@ int main(void)
 	if (storage_err) {
 		LOG_ERR("pairing storage failed (%d); radio will not start", storage_err);
 	}
+#if defined(CONFIG_PUCKOFF_TRANSPORT_BLE_RF)
+	err = ble_gamepad_start();
+#else
 	err = usb_start();
+#endif
 	if (err) {
+#if defined(CONFIG_PUCKOFF_TRANSPORT_BLE_RF)
+		LOG_ERR("BLE transport failed (%d)", err);
+#else
 		LOG_ERR("usb failed (%d)", err);
+#endif
 		return err;
 	}
 	if (storage_err) {
@@ -92,7 +117,11 @@ int main(void)
 		LOG_ERR("radio startup failed (%d)", err);
 		return err;
 	}
+#if defined(CONFIG_PUCKOFF_TRANSPORT_BLE_RF)
+	LOG_WRN("Experimental RF-to-BLE receiver ready; shared-radio rate is best-effort");
+#else
 	LOG_INF("PuckOff ready");
+#endif
 
 	/* LED: slow blink = searching, solid = connected, fast blink = not paired. */
 	for (uint32_t t = 0;; t++) {

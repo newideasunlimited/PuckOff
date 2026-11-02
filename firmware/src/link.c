@@ -339,6 +339,24 @@ static void link_step(void)
 	if (slot < 0 || remaining < POLL_BUDGET_US) {
 		return;
 	}
+#if defined(CONFIG_PUCKOFF_TRANSPORT_BLE_RF)
+	struct slot_state *s = &slots[slot];
+	uint32_t adv_period = active_slot >= 0 ?
+			      ADVERTISE_PERIOD_CONNECTED_MS : ADVERTISE_PERIOD_IDLE_MS;
+	bool adv_due = !s->advertised || now_ms - s->last_adv_ms >= adv_period;
+	bool beacon_due = !s->beaconed || now_ms - s->last_beacon_ms >= SESSION_BEACON_PERIOD_MS;
+
+	/* One grant per frame. Maintenance replaces a poll instead of repeatedly
+	 * losing admission to it; prioritize rendezvous when both are due.
+	 */
+	if (adv_due) {
+		advertise(slot, false, remaining);
+	} else if (beacon_due) {
+		advertise(slot, true, remaining);
+	} else {
+		(void)poll_once(slot, remaining);
+	}
+#else
 	enum poll_result result = poll_once(slot, remaining);
 
 	remaining = frame_remaining();
@@ -364,6 +382,7 @@ static void link_step(void)
 		   remaining >= RADIO_EXCHANGE_OVERHEAD_US + ADVERTISE_REPLY_WINDOW_US) {
 		advertise(slot, false, remaining);
 	}
+#endif
 }
 
 static void link_thread(void *a, void *b, void *c)

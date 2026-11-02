@@ -1,0 +1,5 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Reserve SWI1/EGU1 for the timeslot backend's kernel-safe completion interrupt. */
+&egu1 {
+	status = "disabled";
+};

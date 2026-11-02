@@ -63,6 +63,15 @@ From an existing matching SDK workspace:
 
 The output is `build/receiver/firmware/zephyr/zephyr.uf2` in that checkout.
 
+## Native Apple companion apps
+
+The initial [macOS and iOS apps](apps/apple/README.md) provide native setup
+guidance and in-app input diagnostics. macOS also implements explicit USB
+discovery, read-only management-v1 status, and raw receiver HID diagnostics.
+Status requires the newer management-v1 firmware contract; the original
+receiver firmware does not provide it. The iOS app does not inject a controller
+into other apps or make an unsupported USB receiver system-compatible.
+
 ## License
 
 Apache-2.0. Copyright 2026 New Ideas Unlimited, LLC and the PuckOff contributors.
