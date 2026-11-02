@@ -5,6 +5,7 @@
 
 NRF_RADIO_Type test_radio;
 struct fake_timer test_timer;
+unsigned int test_nvic_enabled, test_nvic_clear_pending;
 
 /* What the simulated MPSL does with the next request. */
 enum plan {
@@ -82,9 +83,15 @@ static void run_slot(void)
 	}
 	memset(&test_radio, 0, sizeof(test_radio));
 	memset(&test_timer, 0, sizeof(test_timer));
+	test_nvic_enabled = 0;
+	test_nvic_clear_pending = 0;
 	send_signal(MPSL_TIMESLOT_SIGNAL_START);
 	CHECK(last_action == MPSL_TIMESLOT_SIGNAL_ACTION_NONE);
 	CHECK(test_radio.TASKS_TXEN == 1);
+	/* The RADIO line must be live in the NVIC before the exchange starts. */
+	CHECK(test_nvic_enabled == 1 && test_nvic_clear_pending == 1);
+	CHECK(test_radio.POWER == 0 && "the controller's RADIO state is not power-cycled");
+	CHECK(test_radio.INTENSET == RADIO_INTENSET_DISABLED_Msk);
 	CHECK(test_timer.inten & NRF_TIMER_INT_COMPARE0_MASK);
 	CHECK(test_timer.cc[0] < last_request.params.earliest.length_us);
 

@@ -9,6 +9,7 @@
 
 #include <string.h>
 #include <zephyr/kernel.h>
+#include <zephyr/irq.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/logging/log.h>
 #include <hal/nrf_timer.h>
@@ -59,6 +60,13 @@ static int job_result;
 static uint8_t last_rssi;
 static bool rx_extended;
 
+static struct radio_timeslot_diag diag;
+
+void radio_timeslot_diag_get(struct radio_timeslot_diag *out)
+{
+	*out = diag;
+}
+
 uint32_t radio_now_us(void)
 {
 	return (uint32_t)k_ticks_to_us_floor64(k_uptime_ticks());
@@ -98,6 +106,16 @@ static mpsl_timeslot_signal_return_param_t *finish(int result)
 	nrf_timer_int_disable(MPSL_TIMER0, NRF_TIMER_INT_COMPARE0_MASK |
 					   NRF_TIMER_INT_COMPARE1_MASK);
 	job_result = result;
+	diag.last_finish_us = slot_now_us();
+	if (result == RADIO_RX_NONE) {
+		diag.rx_none++;
+	} else if (result == RADIO_RX_OK) {
+		diag.rx_ok++;
+	} else if (result == RADIO_RX_BAD_CRC || result == RADIO_RX_INVALID) {
+		diag.rx_bad++;
+	} else if (result == -EIO) {
+		diag.tx_failures++;
+	}
 	atomic_set(&phase, PHASE_DONE);
 	signal_return.callback_action = MPSL_TIMESLOT_SIGNAL_ACTION_END;
 	return &signal_return;
@@ -111,7 +129,9 @@ static mpsl_timeslot_signal_return_param_t *keep_going(void)
 
 static mpsl_timeslot_signal_return_param_t *on_start(void)
 {
+	diag.starts++;
 	if (!atomic_cas(&phase, PHASE_PENDING, PHASE_TX)) {
+		diag.abandoned++;
 		atomic_cas(&phase, PHASE_ABANDONED, PHASE_IDLE);
 		signal_return.callback_action = MPSL_TIMESLOT_SIGNAL_ACTION_END;
 		return &signal_return;
@@ -119,15 +139,28 @@ static mpsl_timeslot_signal_return_param_t *on_start(void)
 	/* Guard: end cleanly before the slot's length runs out. */
 	timer_arm(NRF_TIMER_CC_CHANNEL0, request.params.earliest.length_us - SLOT_MARGIN_US);
 
-	NRF_RADIO->POWER = 0;
-	(void)NRF_RADIO->POWER;
-	NRF_RADIO->POWER = 1;
+	/*
+	 * MPSL hands over a disabled RADIO but leaves the Bluetooth controller's
+	 * register state in place, so reset only what this exchange uses rather
+	 * than power-cycling the peripheral (the same approach Nordic's ESB takes).
+	 */
+	NRF_RADIO->INTENCLR = 0xFFFFFFFF;
+	NRF_RADIO->SHORTS = 0;
 	radio_regs_configure(job_channel, &job_addr);
 	NRF_RADIO->PACKETPTR = (uint32_t)(uintptr_t)tx_scratch;
 	NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
+	NRF_RADIO->EVENTS_READY = 0;
+	NRF_RADIO->EVENTS_ADDRESS = 0;
 	NRF_RADIO->EVENTS_END = 0;
 	NRF_RADIO->EVENTS_DISABLED = 0;
 	NRF_RADIO->INTENSET = RADIO_INTENSET_DISABLED_Msk;
+	/*
+	 * MPSL forwards RADIO interrupts to this callback, but it does not enable
+	 * the RADIO line in the NVIC for an application timeslot: without this the
+	 * exchange completes on the air and nothing ever observes it.
+	 */
+	NVIC_ClearPendingIRQ(RADIO_IRQn);
+	irq_enable(RADIO_IRQn);
 	NRF_RADIO->TASKS_TXEN = 1;
 	return keep_going();
 }
@@ -146,7 +179,9 @@ static mpsl_timeslot_signal_return_param_t *start_rx(void)
 	NRF_RADIO->EVENTS_DISABLED = 0;
 	atomic_set(&phase, PHASE_RX);
 	NRF_RADIO->TASKS_RXEN = 1;
-	timer_arm(NRF_TIMER_CC_CHANNEL1, slot_now_us() + job_rx_timeout_us);
+	diag.last_tx_done_us = slot_now_us();
+	diag.last_rx_deadline_us = diag.last_tx_done_us + job_rx_timeout_us;
+	timer_arm(NRF_TIMER_CC_CHANNEL1, diag.last_rx_deadline_us);
 	return keep_going();
 }
 
@@ -184,6 +219,16 @@ static mpsl_timeslot_signal_return_param_t *on_timer(void)
 {
 	if (nrf_timer_event_check(MPSL_TIMER0, NRF_TIMER_EVENT_COMPARE0)) {
 		nrf_timer_event_clear(MPSL_TIMER0, NRF_TIMER_EVENT_COMPARE0);
+		diag.guard_timeouts++;
+		diag.last_guard_us = slot_now_us();
+		diag.last_guard_phase = (uint32_t)atomic_get(&phase);
+		diag.last_guard_radio_state = NRF_RADIO->STATE;
+		diag.last_guard_events = (NRF_RADIO->EVENTS_READY ? 1U : 0U) |
+					 (NRF_RADIO->EVENTS_ADDRESS ? 2U : 0U) |
+					 (NRF_RADIO->EVENTS_END ? 4U : 0U) |
+					 (NRF_RADIO->EVENTS_DISABLED ? 8U : 0U);
+		diag.last_guard_inten = NRF_RADIO->INTENSET;
+		diag.last_guard_power = NRF_RADIO->POWER;
 		return finish(-ETIMEDOUT);
 	}
 	if (!nrf_timer_event_check(MPSL_TIMER0, NRF_TIMER_EVENT_COMPARE1)) {
@@ -212,13 +257,21 @@ static mpsl_timeslot_signal_return_param_t *timeslot_callback(
 	case MPSL_TIMESLOT_SIGNAL_START:
 		return on_start();
 	case MPSL_TIMESLOT_SIGNAL_RADIO:
+		diag.radio_signals++;
 		return on_radio();
 	case MPSL_TIMESLOT_SIGNAL_TIMER0:
+		diag.timer_signals++;
 		return on_timer();
 	case MPSL_TIMESLOT_SIGNAL_OVERSTAYED:
+		diag.overstayed++;
 		return finish(-ETIMEDOUT);
 	case MPSL_TIMESLOT_SIGNAL_BLOCKED:
 	case MPSL_TIMESLOT_SIGNAL_CANCELLED:
+		if (signal == MPSL_TIMESLOT_SIGNAL_BLOCKED) {
+			diag.blocked++;
+		} else {
+			diag.cancelled++;
+		}
 		/* The slot never started: let the link defer this exchange. */
 		if (atomic_cas(&phase, PHASE_PENDING, PHASE_DONE)) {
 			job_result = -EAGAIN;
@@ -307,11 +360,14 @@ int radio_exchange(uint8_t channel, const struct radio_addr *addr,
 
 	uint32_t start = radio_now_us();
 
+	diag.requests++;
+	diag.last_length_us = length_us;
 	k_sched_lock();
 	int err = mpsl_timeslot_request(session, &request);
 
 	k_sched_unlock();
 	if (err) {
+		diag.request_refused++;
 		atomic_set(&phase, PHASE_IDLE);
 		return -EAGAIN;
 	}

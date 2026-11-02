@@ -5,6 +5,7 @@
 #include "bridge.h"
 #include "gamepad.h"
 #include "remote.h"
+#include "../radio.h"
 
 #include <string.h>
 #include <zephyr/shell/shell.h>
@@ -92,3 +93,25 @@ SHELL_STATIC_SUBCMD_SET_CREATE(ble_commands,
 	SHELL_SUBCMD_SET_END
 );
 SHELL_CMD_REGISTER(ble, &ble_commands, "Bluetooth gamepad / TV remote", NULL);
+
+static int command_radio(const struct shell *shell, size_t argc, char **argv)
+{
+	struct radio_timeslot_diag d;
+
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+	radio_timeslot_diag_get(&d);
+	shell_print(shell, "requests %u refused %u starts %u blocked %u cancelled %u abandoned %u",
+		    d.requests, d.request_refused, d.starts, d.blocked, d.cancelled, d.abandoned);
+	shell_print(shell, "signals: radio %u timer %u overstayed %u",
+		    d.radio_signals, d.timer_signals, d.overstayed);
+	shell_print(shell, "ends: guard %u tx-fail %u rx-none %u rx-ok %u rx-bad %u",
+		    d.guard_timeouts, d.tx_failures, d.rx_none, d.rx_ok, d.rx_bad);
+	shell_print(shell, "last slot: length %u us, tx done %u, rx deadline %u, finish %u",
+		    d.last_length_us, d.last_tx_done_us, d.last_rx_deadline_us, d.last_finish_us);
+	shell_print(shell, "last guard: at %u us, phase %u, radio state %u, events 0x%x (1 ready 2 addr 4 end 8 disabled), inten 0x%08x, power %u",
+		    d.last_guard_us, d.last_guard_phase, d.last_guard_radio_state,
+		    d.last_guard_events, d.last_guard_inten, d.last_guard_power);
+	return 0;
+}
+SHELL_CMD_REGISTER(radio, NULL, "Shared-radio timeslot diagnostics", command_radio);

@@ -50,3 +50,16 @@ uint8_t radio_last_rssi(void);
 
 /* Monotonic RTC time in microseconds (wraps at 2^32; about 31 us resolution). */
 uint32_t radio_now_us(void);
+
+/* Timeslot-backend diagnostics (BLE bridge only): what MPSL signalled and how
+ * each exchange ended. Counters wrap; "last_*" values are TIMER0 microseconds
+ * from the start of the most recent slot that recorded them. */
+struct radio_timeslot_diag {
+	uint32_t starts, radio_signals, timer_signals, overstayed, blocked, cancelled;
+	uint32_t guard_timeouts, tx_failures, rx_none, rx_ok, rx_bad, abandoned;
+	uint32_t requests, request_refused;
+	uint32_t last_length_us, last_tx_done_us, last_rx_deadline_us, last_finish_us;
+	uint32_t last_guard_us, last_guard_phase, last_guard_radio_state;
+	uint32_t last_guard_events, last_guard_inten, last_guard_power;
+};
+void radio_timeslot_diag_get(struct radio_timeslot_diag *out);

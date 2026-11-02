@@ -72,6 +72,17 @@ The guard is off in the default USB image, whose UF2 is unchanged. Host tests
 in `tests/receiver/test_boot_guard.c` cover the policy, watchdog register
 setup, the feed, and both ways to reach the drive.
 
+### Shared-radio diagnostics
+
+The bridge console has a `radio` command that prints the timeslot backend's
+counters: requests made and refused, slots started, blocked or cancelled by
+MPSL, how many RADIO and TIMER0 signals arrived, how each slot ended (guard
+timer, TX failure, no reply, reply, bad reply) and the TIMER0 timestamps of the
+last slot (TX done, RX deadline, finish). A healthy idle board shows `guard 0`,
+`rx-none` close to `starts`, TX done near 110 us and a few percent of requests
+blocked by Bluetooth events. `guard` counting up with `signals: radio 0` means
+RADIO interrupts are not reaching the callback.
+
 ### TV remote mode
 
 The same board can act as a TV remote instead of a gamepad. The BLE HID
@@ -223,6 +234,16 @@ The installed SDK's MPSL timeslot API is the prospective shared-radio mechanism:
   reserved PPI channels **30/31** remain stack-owned.
 - START, RADIO, and TIMER0 signals run at priority 0. No Zephyr scheduling,
   logging, Bluetooth, decoding, or blocking calls belong there.
+- MPSL forwards the RADIO interrupt to the timeslot callback but does **not**
+  enable the RADIO line in the NVIC for an application timeslot. The backend
+  clears any pending RADIO interrupt and enables it at every slot start
+  (Nordic's ESB driver does the same). Without this the exchange completes on
+  the air and the slot ends on its guard timer with `-ETIMEDOUT`; the link then
+  logs `radio exchange failed (-116)` for every poll. Hardware-confirmed
+  2026-11-01.
+- The backend does not power-cycle the RADIO inside a slot. It clears the
+  interrupt enables, shorts and events it uses and rewrites every register it
+  depends on, leaving the Bluetooth controller's remaining register state alone.
 - A timer/hardware cutoff and cleanup before the grant ends are mandatory.
   Overstaying has undefined behavior and can fault MPSL.
 - Blocked/cancelled grants are normal outcomes; neither a requested 4 ms cadence
