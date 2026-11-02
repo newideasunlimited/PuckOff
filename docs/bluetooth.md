@@ -116,6 +116,17 @@ the controller rejoined within ten seconds of being turned back on. After an
 idle shutdown the rejoin took minutes instead; the cause is on the controller
 side and is not understood yet.
 
+Host test (2026-11-02, an iPhone): the phone paired a second board and took
+gamepad input at once. In remote mode with the Apple profile the board sent
+the volume, play/pause and keyboard reports (the console watch showed both
+triggers at full travel and the report counter advancing), but the phone did
+nothing with them: iOS treats the device as a game controller and ignores the
+keyboard and consumer collections. Remote mode is therefore a TV feature; on
+an iPhone the bridge is a gamepad only. Apple TV is untested. With two bridge
+boards running, the controller follows whichever board it joins, so a host
+switch today means turning the other board off; the planned button-chord
+hand-off is not in this build.
+
 ### TV remote mode
 
 The same board can act as a TV remote instead of a gamepad. The BLE HID
