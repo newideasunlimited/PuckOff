@@ -1,6 +1,6 @@
 # Bluetooth transport groundwork
 
-## BLE bridge (experimental, needs hardware testing)
+## BLE bridge (experimental, first hardware test passed)
 
 `ble-bridge.conf` builds a receiver that sends Steam Controller input to a
 Bluetooth LE host. The controller link and Bluetooth share the radio: each
@@ -103,6 +103,18 @@ being powered on next to the board; a controller that had just lost a
 different receiver did not join the bridge for several minutes, so the
 documented pairing step is to turn the controller on after the board is
 running.
+
+Host test (2026-11-02, an LG TV): the TV paired `PuckOff` without a PIN,
+encrypted the link and subscribed to the input report. In gamepad mode the
+controller drove the TV's gamepad input; after `ble mode remote` the d-pad,
+A and B steered the TV's own menus, and the TV was stored as a remembered
+host. The controller link held at -29 dBm with about 95 % of polls answered
+until the controller shut itself down after roughly a quarter of an hour
+without input. A manual power-off (holding the Steam button) delivered no
+`F2` goodbye to the board; the link ended through the 300 ms input timeout and
+the controller rejoined within ten seconds of being turned back on. After an
+idle shutdown the rejoin took minutes instead; the cause is on the controller
+side and is not understood yet.
 
 ### TV remote mode
 
