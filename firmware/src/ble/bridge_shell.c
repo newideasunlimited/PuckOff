@@ -112,6 +112,20 @@ static int command_radio(const struct shell *shell, size_t argc, char **argv)
 	shell_print(shell, "last guard: at %u us, phase %u, radio state %u, events 0x%x (1 ready 2 addr 4 end 8 disabled), inten 0x%08x, power %u",
 		    d.last_guard_us, d.last_guard_phase, d.last_guard_radio_state,
 		    d.last_guard_events, d.last_guard_inten, d.last_guard_power);
+	const struct radio_timeslot_hw *h = &d.hw_at_start;
+
+	shell_print(shell, "at start: ppi chen 0x%08x, timer0 cc %u %u %u %u shorts 0x%x inten 0x%08x",
+		    h->ppi_chen, h->timer_cc[0], h->timer_cc[1], h->timer_cc[2], h->timer_cc[3],
+		    h->timer_shorts, h->timer_inten);
+	shell_print(shell, "at start: radio power %u state %u shorts 0x%x inten 0x%08x mode %u modecnf0 0x%x pcnf0 0x%08x pcnf1 0x%08x",
+		    h->power, h->state, h->shorts, h->inten, h->mode, h->modecnf0, h->pcnf0,
+		    h->pcnf1);
+	shell_print(shell, "at start: crccnf 0x%x tifs %u dacnf 0x%x bcc %u rxaddr 0x%x txaddr %u freq %u txpower 0x%x whiteiv 0x%x",
+		    h->crccnf, h->tifs, h->dacnf, h->bcc, h->rxaddresses, h->txaddress,
+		    h->frequency, h->txpower, h->datawhiteiv);
+	shell_print(shell, "at start: trim 173c 0x%08x 1740 0x%08x 1774 0x%08x, ccm enable %u mode 0x%x, aar enable %u",
+		    h->reg_173c, h->reg_1740, h->reg_1774, h->ccm_enable, h->ccm_mode,
+		    h->aar_enable);
 	return 0;
 }
 SHELL_CMD_REGISTER(radio, NULL, "Shared-radio timeslot diagnostics", command_radio);

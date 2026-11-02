@@ -83,6 +83,27 @@ last slot (TX done, RX deadline, finish). A healthy idle board shows `guard 0`,
 blocked by Bluetooth events. `guard` counting up with `signals: radio 0` means
 RADIO interrupts are not reaching the callback.
 
+The `at start:` lines are a snapshot of the hardware as the Bluetooth
+controller handed it over at the start of the last slot, before the backend
+touched it: the enabled PPI channels, TIMER0 compare values, the RADIO's mode,
+packet, CRC, address and power registers, three undocumented RADIO trim words
+(offsets 0x73C, 0x740 and 0x774, where Nordic's anomaly workarounds live) and
+whether CCM or AAR are enabled. On the tested boards the snapshot shows the
+RADIO still holding the previous slot's configuration, one PPI channel left
+enabled by the Bluetooth stack and trim word 0x73C with bit 10 set (anomaly
+182's fix), none of which disturbs the controller link. Power-cycling the
+RADIO at slot start was tried against this snapshot and changed nothing, so
+the backend leaves the controller's state alone.
+
+Measured on hardware (2026-11-01, one controller next to the board): about
+93 % of 4 ms polls answered at -38 dBm, 11 % of slot requests deferred by
+Bluetooth events while advertising, no guard timeouts, and the board kept
+advertising as `PuckOff` throughout. The controller joined within seconds of
+being powered on next to the board; a controller that had just lost a
+different receiver did not join the bridge for several minutes, so the
+documented pairing step is to turn the controller on after the board is
+running.
+
 ### TV remote mode
 
 The same board can act as a TV remote instead of a gamepad. The BLE HID

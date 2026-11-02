@@ -127,9 +127,48 @@ static mpsl_timeslot_signal_return_param_t *keep_going(void)
 	return &signal_return;
 }
 
+/* Record what the Bluetooth controller left behind; see docs/bluetooth.md. */
+static void snapshot_hw(struct radio_timeslot_hw *hw)
+{
+#if defined(NRF52840_XXAA)
+	hw->ppi_chen = NRF_PPI->CHEN;
+	for (int i = 0; i < 4; i++) {
+		hw->timer_cc[i] = NRF_TIMER0->CC[i];
+	}
+	hw->timer_shorts = NRF_TIMER0->SHORTS;
+	hw->timer_inten = NRF_TIMER0->INTENSET;
+	hw->power = NRF_RADIO->POWER;
+	hw->state = NRF_RADIO->STATE;
+	hw->shorts = NRF_RADIO->SHORTS;
+	hw->inten = NRF_RADIO->INTENSET;
+	hw->mode = NRF_RADIO->MODE;
+	hw->modecnf0 = NRF_RADIO->MODECNF0;
+	hw->pcnf0 = NRF_RADIO->PCNF0;
+	hw->pcnf1 = NRF_RADIO->PCNF1;
+	hw->crccnf = NRF_RADIO->CRCCNF;
+	hw->tifs = NRF_RADIO->TIFS;
+	hw->dacnf = NRF_RADIO->DACNF;
+	hw->bcc = NRF_RADIO->BCC;
+	hw->rxaddresses = NRF_RADIO->RXADDRESSES;
+	hw->txaddress = NRF_RADIO->TXADDRESS;
+	hw->frequency = NRF_RADIO->FREQUENCY;
+	hw->txpower = NRF_RADIO->TXPOWER;
+	hw->datawhiteiv = NRF_RADIO->DATAWHITEIV;
+	hw->reg_173c = *(volatile uint32_t *)0x4000173CUL;
+	hw->reg_1740 = *(volatile uint32_t *)0x40001740UL;
+	hw->reg_1774 = *(volatile uint32_t *)0x40001774UL;
+	hw->ccm_enable = NRF_CCM->ENABLE;
+	hw->ccm_mode = NRF_CCM->MODE;
+	hw->aar_enable = NRF_AAR->ENABLE;
+#else
+	memset(hw, 0, sizeof(*hw));
+#endif
+}
+
 static mpsl_timeslot_signal_return_param_t *on_start(void)
 {
 	diag.starts++;
+	snapshot_hw(&diag.hw_at_start);
 	if (!atomic_cas(&phase, PHASE_PENDING, PHASE_TX)) {
 		diag.abandoned++;
 		atomic_cas(&phase, PHASE_ABANDONED, PHASE_IDLE);

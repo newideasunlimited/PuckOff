@@ -61,5 +61,15 @@ struct radio_timeslot_diag {
 	uint32_t last_length_us, last_tx_done_us, last_rx_deadline_us, last_finish_us;
 	uint32_t last_guard_us, last_guard_phase, last_guard_radio_state;
 	uint32_t last_guard_events, last_guard_inten, last_guard_power;
+	/* Hardware state found at the start of the last slot, before any setup. */
+	struct radio_timeslot_hw {
+		uint32_t ppi_chen;
+		uint32_t timer_cc[4], timer_shorts, timer_inten;
+		uint32_t power, state, shorts, inten, mode, modecnf0, pcnf0, pcnf1;
+		uint32_t crccnf, tifs, dacnf, bcc, rxaddresses, txaddress;
+		uint32_t frequency, txpower, datawhiteiv;
+		uint32_t reg_173c, reg_1740, reg_1774;
+		uint32_t ccm_enable, ccm_mode, aar_enable;
+	} hw_at_start;
 };
 void radio_timeslot_diag_get(struct radio_timeslot_diag *out);
