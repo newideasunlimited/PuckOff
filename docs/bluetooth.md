@@ -127,6 +127,15 @@ boards running, the controller follows whichever board it joins, so a host
 switch today means turning the other board off; the planned button-chord
 hand-off is not in this build.
 
+Host test (2026-11-02, a Samsung TV): the TV paired, encrypted and subscribed,
+and the board sent gamepad reports at the usual rate with no failures, but the
+TV's controller tester app saw no input: the Samsung does not expose this
+device's gamepad collection to apps. After `ble mode remote` the d-pad, A and B
+steered the TV's own menus, so the keyboard and consumer collections are
+parsed. On a Samsung the bridge is therefore a remote today; gamepad use would
+need the TV to accept the device as a gamepad, which may depend on its vendor
+identity or report map and is not understood yet.
+
 ### TV remote mode
 
 The same board can act as a TV remote instead of a gamepad. The BLE HID
