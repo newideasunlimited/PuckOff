@@ -82,8 +82,9 @@ From an existing matching SDK workspace:
 
 The output is `build/receiver/firmware/zephyr/zephyr.uf2` in that checkout.
 Generic HID plus the serial console remains the default. The experimental
-wired Switch image has **no serial console**; build and recovery instructions
-are in [USB modes](docs/usb-modes.md).
+wired Switch image has **no serial console**; `tools/puckoff_bootloader.py`
+sends it back to the UF2 bootloader over USB HID for reflashing. Build and
+recovery instructions are in [USB modes](docs/usb-modes.md).
 
 ## Native Apple companion apps
 

@@ -115,7 +115,11 @@ the game like their sticks.
 
 Both control `SET_REPORT(Output, ID 0)` and interrupt OUT accept exactly eight
 bytes. They retain an opaque vendor report for `GET_REPORT(Output, ID 0)` but
-do not drive any actuator. Malformed control reports stall; malformed interrupt
+do not drive any actuator. One value is special: the bytes `PuckOff` followed
+by `0x57` (`SWITCH_BOOTLOADER_REPORT`) make the board reboot into the UF2
+bootloader about 50 ms later, which is the console-less image's software route
+to a reflash (`tools/puckoff_bootloader.py`). Any USB host can send it; it
+leads only to the bootloader, never to a flash write. Malformed control reports stall; malformed interrupt
 OUT packets are logged and discarded. This is not Nintendo's `0x80` USB
 handshake / `0x01` subcommand / `0x30` input Pro Controller protocol.
 
@@ -294,9 +298,13 @@ magic/cold-reboot call at the deadline; it does not claim a physical remount.
    confirm A is the Steam controller's physical B button in this positional
    mapping. Record the console firmware, dock/adapter and game. Leave
    untested features and Switch 2 explicitly unknown.
-8. To change pairing or recover, double-tap RST to GND and restore the
-   known-good generic UF2. The standalone Switch image intentionally has no
-   serial setup console.
+8. To change pairing or reflash, run `python tools/puckoff_bootloader.py`
+   with the board on the computer: it sends the bootloader output report
+   (ASCII `PuckOff` + `0x57`, `CONFIG_PUCKOFF_USB_BOOTLOADER_REPORT`, on by
+   default in the Switch profile) and waits for the UF2 drive. Double-tapping
+   RST to GND does the same by hand and is the fallback for an image that
+   does not boot. The standalone Switch image intentionally has no serial
+   setup console.
 
 ## Provenance
 

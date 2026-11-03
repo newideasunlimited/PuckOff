@@ -10,7 +10,8 @@
 #include <zephyr/usb/class/usbd_hid.h>
 #include <zephyr/logging/log.h>
 
-#if defined(CONFIG_PUCKOFF_USB_TEST_RECOVERY)
+#if defined(CONFIG_PUCKOFF_USB_TEST_RECOVERY) || defined(CONFIG_PUCKOFF_USB_BOOTLOADER_REPORT)
+#define PUCKOFF_UF2_RETURN 1
 #include <hal/nrf_power.h>
 #include <zephyr/sys/reboot.h>
 #endif
@@ -85,10 +86,11 @@ static uint8_t output_state[SWITCH_OUTPUT_SIZE];
 static void tx_work_handler(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(tx_work, tx_work_handler);
 
-#if defined(CONFIG_PUCKOFF_USB_TEST_RECOVERY)
+#if defined(PUCKOFF_UF2_RETURN)
+/* Shared by the development timeout and the bootloader output report. */
 static void return_to_uf2(struct k_work *work)
 {
-	LOG_WRN("development timeout: returning to UF2");
+	LOG_WRN("returning to UF2");
 	NRF_POWER->GPREGRET = 0x57;
 	sys_reboot(SYS_REBOOT_COLD);
 }
@@ -278,7 +280,16 @@ static int set_report(const struct device *dev, const uint8_t type, const uint8_
 	K_SPINLOCK(&lock) {
 		memcpy(output_state, buf, sizeof(output_state));
 	}
-	/* This vendor report has no implemented actuator (not rumble or player LEDs). */
+#if defined(CONFIG_PUCKOFF_USB_BOOTLOADER_REPORT)
+	static const uint8_t bootloader[SWITCH_OUTPUT_SIZE] = SWITCH_BOOTLOADER_REPORT;
+
+	if (memcmp(buf, bootloader, sizeof(bootloader)) == 0) {
+		/* Let the transfer complete before the reboot. */
+		LOG_WRN("bootloader report received");
+		k_work_reschedule(&recovery_work, K_MSEC(50));
+	}
+#endif
+	/* This vendor report has no other actuator (not rumble or player LEDs). */
 	return 0;
 }
 

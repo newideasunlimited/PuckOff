@@ -16,7 +16,8 @@ foreach(mode generic switch switch_recovery)
 	add_executable(usb_${mode} test_transport.c "${FIRMWARE}/usb.c"
 		"${FIRMWARE}/gamepad.c" "${FIRMWARE}/usb_switch.c")
 	if(NOT mode STREQUAL generic)
-		target_compile_definitions(usb_${mode} PRIVATE CONFIG_PUCKOFF_USB_SWITCH=1)
+		target_compile_definitions(usb_${mode} PRIVATE CONFIG_PUCKOFF_USB_SWITCH=1
+			CONFIG_PUCKOFF_USB_BOOTLOADER_REPORT=1)
 	else()
 		target_compile_definitions(usb_${mode} PRIVATE CONFIG_USBD_CDC_ACM_CLASS=1)
 	endif()

@@ -10,6 +10,9 @@
 extern const uint8_t switch_hid_desc[];
 extern const size_t switch_hid_desc_len;
 
+/* Output report that asks the board to reboot into the UF2 bootloader. */
+#define SWITCH_BOOTLOADER_REPORT { 'P', 'u', 'c', 'k', 'O', 'f', 'f', 0x57 }
+
 /* Radial stick deadzone, in gamepad_report axis counts (10 % of full travel). */
 #define SWITCH_STICK_DEADZONE 3277
 

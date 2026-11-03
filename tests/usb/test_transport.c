@@ -12,10 +12,9 @@
 #include "usb.h"
 #include "usb_switch.h"
 
-#if defined(CONFIG_PUCKOFF_USB_TEST_RECOVERY)
+#if defined(CONFIG_PUCKOFF_USB_TEST_RECOVERY) || defined(CONFIG_PUCKOFF_USB_BOOTLOADER_REPORT)
 #include <hal/nrf_power.h>
 #include <zephyr/sys/reboot.h>
-#define BACKGROUND_WORK_COUNT 1
 struct test_power_registers test_power;
 static unsigned int reboot_count;
 
@@ -24,6 +23,9 @@ void sys_reboot(int type)
 	assert(type == SYS_REBOOT_COLD);
 	reboot_count++;
 }
+#endif
+#if defined(CONFIG_PUCKOFF_USB_TEST_RECOVERY)
+#define BACKGROUND_WORK_COUNT 1
 #else
 #define BACKGROUND_WORK_COUNT 0
 #endif
@@ -629,6 +631,32 @@ static void test_output_reports(void)
 }
 #endif
 
+#if defined(CONFIG_PUCKOFF_USB_BOOTLOADER_REPORT) && !defined(CONFIG_PUCKOFF_USB_TEST_RECOVERY)
+static void test_bootloader_report(void)
+{
+	uint8_t magic[8] = SWITCH_BOOTLOADER_REPORT, result[8];
+
+	fixture();
+	/* A near miss is stored like any vendor report and schedules nothing. */
+	magic[7] = 0x56;
+	assert(ops->set_report(&test_device, HID_REPORT_TYPE_OUTPUT, 0, 8, magic) == 0);
+	assert(pending_work_count() == 0 && warnings == 0);
+	advance(1000);
+	assert(reboot_count == 0 && test_power.GPREGRET == 0);
+
+	/* The exact report reboots into UF2 shortly after the transfer completes. */
+	magic[7] = 0x57;
+	ops->output_report(&test_device, 8, magic);
+	assert(ops->get_report(&test_device, HID_REPORT_TYPE_OUTPUT, 0, 8, result) == 8);
+	assert(memcmp(result, magic, 8) == 0);
+	assert(pending_work_count() == 1 && warnings == 1);
+	advance(49);
+	assert(reboot_count == 0);
+	advance(1);
+	assert(reboot_count == 1 && test_power.GPREGRET == 0x57);
+}
+#endif
+
 #if defined(CONFIG_PUCKOFF_USB_TEST_RECOVERY)
 static void test_timed_recovery(void)
 {
@@ -659,6 +687,9 @@ int main(void)
 #endif
 #if defined(CONFIG_PUCKOFF_USB_TEST_RECOVERY)
 	test_timed_recovery();
+#endif
+#if defined(CONFIG_PUCKOFF_USB_BOOTLOADER_REPORT) && !defined(CONFIG_PUCKOFF_USB_TEST_RECOVERY)
+	test_bootloader_report();
 #endif
 	puts("USB control, retry, idle, suspend and buffer-ownership tests passed");
 	return 0;

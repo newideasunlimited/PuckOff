@@ -27,6 +27,20 @@ config PUCKOFF_USB_SWITCH
 
 endchoice
 
+config PUCKOFF_USB_BOOTLOADER_REPORT
+	bool "Reboot to UF2 when the host sends the bootloader output report"
+	depends on PUCKOFF_USB_SWITCH && BOARD_PROMICRO_NRF52840_NRF52840_UF2
+	default y
+	select REBOOT
+	help
+	  The standalone Switch image has no serial console, so this is its
+	  software route back to the Adafruit UF2 bootloader: an eight-byte
+	  output report equal to SWITCH_BOOTLOADER_REPORT (ASCII "PuckOff"
+	  followed by 0x57) reboots the board into the bootloader about 50 ms
+	  later. tools/puckoff_bootloader.py sends it. Any USB host can send
+	  the report; it only ever leads to the bootloader, never to a flash
+	  write, and physical reset access should still be preserved.
+
 config PUCKOFF_USB_TEST_RECOVERY
 	bool "DEVELOPMENT ONLY: return to UF2 after 120 seconds"
 	depends on PUCKOFF_USB_SWITCH && BOARD_PROMICRO_NRF52840_NRF52840_UF2
