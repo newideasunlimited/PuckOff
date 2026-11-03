@@ -189,6 +189,23 @@ static void test_controller_mapping(void)
 	input.buttons = BTN_LT_CLICK | BTN_RT_CLICK;
 	gamepad_from_ctrl(&input, &report);
 	assert(report.lt == 255 && report.rt == 255);
+
+	/* Trackpads stand in for the sticks only while touched. */
+	input = (struct ctrl_state) {
+		.lx = 1000, .ly = 2000, .rx = 3000, .ry = 4000,
+		.lpad_x = -20000, .lpad_y = 30000, .rpad_x = INT16_MIN, .rpad_y = -500,
+	};
+	gamepad_from_ctrl(&input, &report);
+	gamepad_pads_as_sticks(&input, &report);
+	assert(report.lx == 1000 && report.ly == -2000 && report.rx == 3000 && report.ry == -4000);
+	input.buttons = BTN_LPAD_TOUCH;
+	gamepad_from_ctrl(&input, &report);
+	gamepad_pads_as_sticks(&input, &report);
+	assert(report.lx == -20000 && report.ly == -30000 && report.rx == 3000 && report.ry == -4000);
+	input.buttons = BTN_LPAD_TOUCH | BTN_RPAD_TOUCH;
+	gamepad_from_ctrl(&input, &report);
+	gamepad_pads_as_sticks(&input, &report);
+	assert(report.rx == -INT16_MAX && report.ry == 500);
 }
 
 static void test_wire_encoding(void)

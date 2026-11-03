@@ -90,8 +90,11 @@ a VID/PID substitution**.
 
 Face buttons keep their **physical positions**: Steam A (south) becomes Switch
 B; Steam B (east) becomes A; Steam X (west) becomes Y; Steam Y (north) becomes X.
-LB/RB map to L/R, View/Menu to Minus/Plus, and Steam to Home. QAM, back buttons,
-touchpads and touch sensors are not exposed. The conservative 13-button
+LB/RB map to L/R, View/Menu to Minus/Plus, and Steam to Home. While a finger
+rests on a trackpad, that pad's position stands in for the stick on the same
+side (`gamepad_pads_as_sticks()`), so either can drive a game's stick input;
+the pads are not exposed in any other form. QAM, back buttons and touch
+sensors are not exposed. The conservative 13-button
 descriptor does not declare Capture. No rumble, player LEDs, motion, NFC,
 battery reporting, console wakeup, or Switch 2 compatibility is claimed.
 

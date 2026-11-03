@@ -67,6 +67,10 @@ static void on_input(int slot, const struct ctrl_state *st)
 	}
 	active_slot = slot;
 	gamepad_from_ctrl(st, &r);
+#ifdef CONFIG_PUCKOFF_USB_SWITCH
+	/* The console has no use for raw trackpads; let them stand in for the sticks. */
+	gamepad_pads_as_sticks(st, &r);
+#endif
 	send_report(st, &r);
 
 	if (atomic_get(&watch) && (st->buttons != last_seen.buttons ||

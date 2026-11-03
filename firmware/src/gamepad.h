@@ -39,6 +39,12 @@ extern const size_t gamepad_hid_desc_len;
 
 void gamepad_from_ctrl(const struct ctrl_state *in, struct gamepad_report *out);
 void gamepad_neutral(struct gamepad_report *out);
+/*
+ * While a finger rests on a trackpad, that pad's position replaces the stick on
+ * the same side, so a pad can be used like a thumbstick. Pads not touched leave
+ * the sticks as gamepad_from_ctrl() set them.
+ */
+void gamepad_pads_as_sticks(const struct ctrl_state *in, struct gamepad_report *out);
 /* Wire encoding is little-endian regardless of the CPU's byte order. */
 void gamepad_encode_generic(const struct gamepad_report *in,
 			    uint8_t out[GAMEPAD_REPORT_SIZE]);

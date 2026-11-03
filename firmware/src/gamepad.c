@@ -139,6 +139,18 @@ void gamepad_from_ctrl(const struct ctrl_state *in, struct gamepad_report *out)
 	out->rt = trigger8(in->rt, in->buttons & BTN_RT_CLICK);
 }
 
+void gamepad_pads_as_sticks(const struct ctrl_state *in, struct gamepad_report *out)
+{
+	if (in->buttons & BTN_LPAD_TOUCH) {
+		out->lx = in->lpad_x == INT16_MIN ? -INT16_MAX : in->lpad_x;
+		out->ly = flip(in->lpad_y);
+	}
+	if (in->buttons & BTN_RPAD_TOUCH) {
+		out->rx = in->rpad_x == INT16_MIN ? -INT16_MAX : in->rpad_x;
+		out->ry = flip(in->rpad_y);
+	}
+}
+
 static void put16(uint8_t *out, uint16_t value)
 {
 	out[0] = (uint8_t)value;
