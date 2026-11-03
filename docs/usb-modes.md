@@ -3,7 +3,7 @@
 PuckOff implements its own HID reports on Zephyr's **new USB device stack**.
 Generic mode is the default. The second mode targets the publicly documented
 wired Pokken-style protocol accepted by the original Nintendo Switch; it is
-**opt-in and not yet hardware-verified in PuckOff**. There is no host
+**opt-in**, and was first confirmed on hardware on 2026-11-02 (see the Switch 2 note below). There is no host
 autodetection, Nintendo Pro Controller protocol, or Xbox/PlayStation
 authentication implementation.
 
@@ -94,6 +94,15 @@ LB/RB map to L/R, View/Menu to Minus/Plus, and Steam to Home. QAM, back buttons,
 touchpads and touch sensors are not exposed. The conservative 13-button
 descriptor does not declare Capture. No rumble, player LEDs, motion, NFC,
 battery reporting, console wakeup, or Switch 2 compatibility is claimed.
+
+Hardware result (2026-11-02): the two-minute recovery variant of this image
+was plugged into a **Nintendo Switch 2** with Pro Controller Wired
+Communication enabled. The console accepted the device and the human tester
+drove it with the controller until the image rebooted itself into the
+bootloader at the two-minute mark, after which the console asked for a
+controller again, as expected for that variant. Button-by-button mapping, a
+named game and the standalone playing image are still to be checked; the
+original Switch remains untested.
 
 Both control `SET_REPORT(Output, ID 0)` and interrupt OUT accept exactly eight
 bytes. They retain an opaque vendor report for `GET_REPORT(Output, ID 0)` but
