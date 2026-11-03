@@ -109,7 +109,9 @@ original Switch remains untested. During that session the left stick drifted
 slightly when released: the console applies no deadzone to a wired generic
 controller and the encoder passed the stick's resting offset (about 2-3 % of
 travel) straight through. The radial deadzone above was added in response and
-needs its own hardware check.
+confirmed on the same console on 2026-11-03, together with the trackpads
+standing in for the sticks: the released stick sat still and both pads moved
+the game like their sticks.
 
 Both control `SET_REPORT(Output, ID 0)` and interrupt OUT accept exactly eight
 bytes. They retain an opaque vendor report for `GET_REPORT(Output, ID 0)` but

@@ -20,7 +20,7 @@ used on redistributed, sold, or manufactured devices. See
 | Controller link (2.4 GHz, 250 Hz target)  | Baseline demonstrated on one controller |
 | Generic USB HID gamepad                  | macOS HIDAPI and Brave input confirmed on the baseline; other hosts/games need testing |
 | Four stored bonds, one active controller | Implemented; not four simultaneous gamepads |
-| Wired Switch / Pokken-style USB HID      | Implemented, opt-in; controller input confirmed on a Nintendo Switch 2 (two-minute test image) |
+| Wired Switch / Pokken-style USB HID      | Implemented, opt-in; controller input, stick deadzone and pads-as-sticks confirmed on a Nintendo Switch 2 |
 | Xbox / PlayStation console support       | Not implemented; no authentication support |
 | Steam receiver mode (pairing from Steam)  | Planned      |
 | Bluetooth to TVs, phones, Apple TV        | Experimental BLE bridge build with gamepad and TV-remote modes; gamepad and remote modes verified on an LG TV, remote mode only on a Samsung TV, gamepad on an iPhone; Apple TV and Android hosts untested |
