@@ -55,9 +55,49 @@ const uint8_t switch_hid_desc[] = {
 };
 const size_t switch_hid_desc_len = sizeof(switch_hid_desc);
 
-static uint8_t axis8(int16_t value)
+static uint8_t axis8(int32_t value)
 {
-	return (uint8_t)(((int32_t)value + 32768) >> 8);
+	return (uint8_t)((value + 32768) >> 8);
+}
+
+static int32_t isqrt32(int64_t n)
+{
+	int64_t lo = 0, hi = 65536;
+
+	while (lo < hi) {
+		int64_t mid = (lo + hi + 1) / 2;
+
+		if (mid * mid <= n) {
+			lo = mid;
+		} else {
+			hi = mid - 1;
+		}
+	}
+	return (int32_t)lo;
+}
+
+/*
+ * The console applies no deadzone of its own to a wired generic controller, so
+ * a stick resting a few percent off centre shows as drift. Deflections inside
+ * SWITCH_STICK_DEADZONE report centre; beyond it the vector is rescaled so the
+ * deadzone edge maps to centre and full travel still reaches the report edge.
+ */
+static void stick8(int16_t x, int16_t y, uint8_t *out_x, uint8_t *out_y)
+{
+	int64_t sx = x < -32767 ? -32767 : x, sy = y < -32767 ? -32767 : y;
+	int32_t r = isqrt32(sx * sx + sy * sy);
+
+	if (r <= SWITCH_STICK_DEADZONE) {
+		*out_x = 128;
+		*out_y = 128;
+		return;
+	}
+	sx = sx * (r - SWITCH_STICK_DEADZONE) * 32767 / ((32767 - SWITCH_STICK_DEADZONE) * (int64_t)r);
+	sy = sy * (r - SWITCH_STICK_DEADZONE) * 32767 / ((32767 - SWITCH_STICK_DEADZONE) * (int64_t)r);
+	sx = sx > 32767 ? 32767 : (sx < -32767 ? -32767 : sx);
+	sy = sy > 32767 ? 32767 : (sy < -32767 ? -32767 : sy);
+	*out_x = axis8((int32_t)sx);
+	*out_y = axis8((int32_t)sy);
 }
 
 void switch_encode_report(const struct gamepad_report *in,
@@ -86,9 +126,7 @@ void switch_encode_report(const struct gamepad_report *in,
 	out[0] = (uint8_t)bits;
 	out[1] = (uint8_t)(bits >> 8);
 	out[2] = in->hat;
-	out[3] = axis8(in->lx);
-	out[4] = axis8(in->ly);
-	out[5] = axis8(in->rx);
-	out[6] = axis8(in->ry);
+	stick8(in->lx, in->ly, &out[3], &out[4]);
+	stick8(in->rx, in->ry, &out[5], &out[6]);
 	out[7] = 0;
 }

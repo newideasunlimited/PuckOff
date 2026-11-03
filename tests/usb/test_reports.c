@@ -235,13 +235,45 @@ static void test_wire_encoding(void)
 	switch_encode_report(&report, wired);
 	assert(wired[0] == 0x40 && wired[1] == 0);
 
-	for (int32_t axis = INT16_MIN; axis <= INT16_MAX; axis++) {
-		report.lx = report.ly = report.rx = report.ry = (int16_t)axis;
+	/* Radial deadzone: anything inside it is centre, including a resting offset. */
+	const int16_t inside[][2] = {
+		{0, 0}, {SWITCH_STICK_DEADZONE, 0}, {0, -SWITCH_STICK_DEADZONE},
+		{900, 500}, {-2300, 2300}, {1, 1},
+	};
+
+	for (size_t i = 0; i < sizeof(inside) / sizeof(inside[0]); i++) {
+		report.lx = report.rx = inside[i][0];
+		report.ly = report.ry = inside[i][1];
 		switch_encode_report(&report, wired);
-		for (unsigned int i = 3; i <= 6; i++) {
-			assert(wired[i] == (axis + 32768) / 256);
-		}
+		assert(wired[3] == 128 && wired[4] == 128 && wired[5] == 128 && wired[6] == 128);
 	}
+
+	/* Full travel still reaches the report edges, on axes and on the diagonal. */
+	report.lx = 32767; report.ly = 0; report.rx = -32767; report.ry = INT16_MIN;
+	switch_encode_report(&report, wired);
+	assert(wired[3] == 255 && wired[4] == 128 && wired[5] == 0 && wired[6] == 0);
+	report.lx = 23170; report.ly = 23170; /* full travel on the diagonal: unchanged */
+	switch_encode_report(&report, wired);
+	assert(wired[3] >= 217 && wired[3] <= 219 && wired[4] == wired[3]);
+
+	/* Along one axis the output is continuous at the deadzone edge and monotonic. */
+	uint8_t last = 128;
+
+	for (int32_t axis = INT16_MIN; axis <= INT16_MAX; axis++) {
+		report.lx = (int16_t)axis;
+		report.ly = 0;
+		switch_encode_report(&report, wired);
+		assert(wired[4] == 128);
+		if (axis > INT16_MIN) {
+			assert(wired[3] >= last);
+			assert(wired[3] - last <= 1);
+		}
+		if (axis > -SWITCH_STICK_DEADZONE && axis < SWITCH_STICK_DEADZONE) {
+			assert(wired[3] == 128);
+		}
+		last = wired[3];
+	}
+	assert(last == 255);
 }
 
 int main(void)

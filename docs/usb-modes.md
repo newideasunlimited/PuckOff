@@ -41,7 +41,7 @@ applications must not assume W3C standard button/axis indices.
 | Interrupt OUT | None | 8-byte vendor reports, 64-byte endpoint, 5 ms polling |
 | Report IDs | None | None |
 | Buttons | 16 | 13 |
-| Sticks | Four signed 16-bit axes | Four unsigned 8-bit axes |
+| Sticks | Four signed 16-bit axes | Four unsigned 8-bit axes, 10 % radial deadzone, rescaled |
 | Triggers | Two analog 8-bit axes | Digital ZL/ZR at half travel or trigger click |
 | D-pad | Hat 0..7 clockwise from up, 8 centered | Same |
 
@@ -85,7 +85,7 @@ a VID/PID substitution**.
 |-------------|----------|
 | 0..1 | Little-endian buttons: Y, B, A, X, L, R, ZL, ZR, Minus, Plus, L3, R3, Home; upper three bits zero |
 | 2 | Hat 0..7, 8 centered; high nibble zero |
-| 3..6 | Left X/Y, right X/Y, 0..255; center 128; positive Y down |
+| 3..6 | Left X/Y, right X/Y, 0..255; center 128; positive Y down. Each stick passes a radial deadzone of 10 % of travel (`SWITCH_STICK_DEADZONE`); inside it both bytes are 128, beyond it the vector is rescaled so the deadzone edge is centre and full travel still reaches 0/255 on an axis |
 | 7 | Vendor byte, always zero |
 
 Face buttons keep their **physical positions**: Steam A (south) becomes Switch
@@ -102,7 +102,11 @@ drove it with the controller until the image rebooted itself into the
 bootloader at the two-minute mark, after which the console asked for a
 controller again, as expected for that variant. Button-by-button mapping, a
 named game and the standalone playing image are still to be checked; the
-original Switch remains untested.
+original Switch remains untested. During that session the left stick drifted
+slightly when released: the console applies no deadzone to a wired generic
+controller and the encoder passed the stick's resting offset (about 2-3 % of
+travel) straight through. The radial deadzone above was added in response and
+needs its own hardware check.
 
 Both control `SET_REPORT(Output, ID 0)` and interrupt OUT accept exactly eight
 bytes. They retain an opaque vendor report for `GET_REPORT(Output, ID 0)` but

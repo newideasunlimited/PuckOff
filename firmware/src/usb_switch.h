@@ -10,5 +10,8 @@
 extern const uint8_t switch_hid_desc[];
 extern const size_t switch_hid_desc_len;
 
+/* Radial stick deadzone, in gamepad_report axis counts (10 % of full travel). */
+#define SWITCH_STICK_DEADZONE 3277
+
 void switch_encode_report(const struct gamepad_report *in,
 			  uint8_t out[SWITCH_REPORT_SIZE]);
