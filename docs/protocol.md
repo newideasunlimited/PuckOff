@@ -121,6 +121,48 @@ claims. See [receiver reliability](receiver.md) for the test boundary.
 
 Button bits are listed in `firmware/src/input.h`.
 
+## Passive sniffer
+
+`modes/sniffer.conf` (`CONFIG_PUCKOFF_SNIFFER`, stacked on the default USB
+build) replaces the receiver with a listener that never transmits. It waits on
+the rendezvous address for another receiver's `E1` advertisement, follows it to
+the announced session channel and address, and prints every packet that is not
+a bare poll or plain input on the console (`sniff all on` prints those too,
+`sniff status` shows counters). Identifiers and addresses are withheld from the
+output. It exists to confirm over-air formats from our own captures.
+
+First observation (2026-11-04, official puck on a Mac with Steam open and the
+controller off): the puck sends a one-byte `E2` packet on its session address
+every 100 ms, at a channel it chose itself (74, later 78), i.e. not the fixed
+channel 18 PuckOff uses. Nothing else was captured before this line of work was
+paused.
+
+## Official puck USB layout (own capture)
+
+Read from the Mac's I/O registry with the official puck plugged in, 2026-11-04;
+no command was sent to it. Device `28de:1304`, `bcdDevice 2`, composite
+(class 0xEF/0x02/0x01), one configuration:
+
+| Interface | Class | Role |
+|-----------|-------|------|
+| 0, 1 | CDC ACM control + data | serial console (`dongle~$`) |
+| 2, 3, 4, 5 | HID | one controller slot each; 2 ms interval; input 54, output 64, feature 64 bytes |
+| 6 | HID | puck channel; 32 ms interval; input 54, output 1, feature 64 bytes |
+
+The slot report descriptor (372 bytes) holds three application collections:
+a boot-style mouse (report `0x40`: two buttons, X, Y, wheel, AC Pan) and a
+keyboard (`0x41`: modifiers, six keys) for lizard mode, then a vendor collection
+(usage page `0xFF00`, usage 1) with inputs `0x42` (53 data bytes), `0x44` (5),
+`0x79` (1), `0x43` (14), `0x7b` (12), `0x45` (45); outputs `0x80` (9), `0x81`
+(7), `0x82` (3), `0x83` (9), `0x84` (8), `0x85` (3), `0x86` (3), `0x87`, `0x89`,
+`0x88` (63 each); and two 63-byte feature reports, IDs 1 and 2. The puck channel
+descriptor (54 bytes) is the vendor collection with usage 2, inputs `0x42` and
+`0x79`, and the same two feature reports. Steam opens interfaces 2 to 5 as
+controller indices 0 to 3 ("V1 HID protocol via Dongle"). The host-side meaning
+of these reports is in SDL's Steam Triton driver (zlib) and the sc2-research
+notes (MIT); the keyboard collection is what makes macOS gate the device behind
+Input Monitoring.
+
 ## USB reports
 
 The USB-facing formats are separate from these radio packets. See

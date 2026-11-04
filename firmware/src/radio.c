@@ -217,6 +217,27 @@ int radio_exchange(uint8_t channel, const struct radio_addr *addr,
 	return err;
 }
 
+int radio_receive(uint8_t channel, const struct radio_addr *addr, uint8_t *rx,
+		  size_t rx_capacity, uint32_t timeout_us)
+{
+	if (addr == NULL || rx == NULL || rx_capacity < 3 || timeout_us == 0) {
+		return -EINVAL;
+	}
+	if (!initialized) {
+		return -ENODEV;
+	}
+	int err = configure(channel, addr);
+
+	if (!err) {
+		err = radio_listen(rx, rx_capacity, timeout_us);
+	}
+	NRF_RADIO->SHORTS = 0;
+	if (err == -ETIMEDOUT || err == -EIO) {
+		radio_reset();
+	}
+	return err;
+}
+
 uint8_t radio_last_rssi(void)
 {
 	return last_rssi;

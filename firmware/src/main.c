@@ -18,6 +18,9 @@
 #ifdef CONFIG_PUCKOFF_TRANSPORT_BLE_BRIDGE
 #include "ble/bridge.h"
 #endif
+#ifdef CONFIG_PUCKOFF_SNIFFER
+#include "sniff.h"
+#endif
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
@@ -133,7 +136,13 @@ int main(void)
 		}
 #endif
 		boot_guard_stage(BOOT_STAGE_RADIO);
+#ifdef CONFIG_PUCKOFF_SNIFFER
+		(void)on_input;
+		(void)on_lost;
+		err = sniff_start();
+#else
 		err = link_start(on_input, on_lost);
+#endif
 		if (err) {
 			LOG_ERR("radio startup failed (%d)", err);
 			return err;

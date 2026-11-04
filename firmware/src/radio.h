@@ -45,6 +45,15 @@ int radio_exchange(uint8_t channel, const struct radio_addr *addr,
 		   const uint8_t *tx, size_t tx_len, uint8_t *rx, size_t rx_capacity,
 		   uint32_t rx_timeout_us, uint32_t budget_us);
 
+/*
+ * Receive-only: listen on the given channel/address for one packet. Same
+ * buffer and result conventions as radio_exchange, no transmission at all.
+ * Raw backend only (the passive sniffer); the timeslot backend does not
+ * provide it.
+ */
+int radio_receive(uint8_t channel, const struct radio_addr *addr, uint8_t *rx,
+		  size_t rx_capacity, uint32_t timeout_us);
+
 /* Signal strength of the last received packet, in -dBm. */
 uint8_t radio_last_rssi(void);
 

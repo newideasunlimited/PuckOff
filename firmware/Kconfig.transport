@@ -38,3 +38,13 @@ config PUCKOFF_BLE_GAMEPAD_ONLY
 	  also carries a keyboard collection as a protected input device and
 	  does not hand its gamepad reports to apps. The host sees a different
 	  GATT database, so forget and re-pair the board after changing this.
+
+config PUCKOFF_SNIFFER
+	bool "Passive link sniffer instead of the receiver"
+	depends on PUCKOFF_TRANSPORT_USB_RAW_RF && SHELL
+	help
+	  Never transmit. Follow another receiver's advertisements from the
+	  rendezvous address to its session and print the packets exchanged
+	  there on the console, so over-air formats can be confirmed from our
+	  own captures. The controller link, polling and USB input are off;
+	  pairing identifiers and session addresses are never printed.
