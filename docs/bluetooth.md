@@ -196,9 +196,15 @@ included.
 report map ends after Report ID 1, the HID service has one input report, and
 `ble mode remote` is refused. With that image the Mac read the controller's
 reports through plain HID (hidapi, which is also the path Steam Input and
-browsers use). Apple's GameController framework does not list the device, so
-Mac apps that only use that framework (an "MFi" controller in its terms) do not
-see it. A host keeps its cached copy of the old report map: after switching
+browsers use). Apple's GameController framework answers yes to
+`GCController.supportsHIDDevice` for the device (and for the USB receiver) but
+never lists a controller for either, which on macOS 27.3 (2026-11-04) also
+keeps Steam from showing it: SDL's macOS joystick code hands every device the
+framework claims to the framework and skips the raw HID path, so a claimed but
+never listed gamepad belongs to nobody. This is a known macOS 26/27 behaviour
+for generic HID gamepads of any make, tracked in SDL issue 16473, not something
+the descriptor can fix. Mac apps that read HID themselves (hidapi, IOHIDManager)
+do see the puck. A host keeps its cached copy of the old report map: after switching
 builds, forget the board on the host and `ble forget_hosts` on the board, then
 pair again.
 
