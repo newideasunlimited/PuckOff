@@ -66,6 +66,10 @@ static int command_mode(const struct shell *shell, size_t argc, char **argv)
 		return -EINVAL;
 	}
 	mode = strcmp(argv[1], "remote") == 0 ? BLE_MODE_REMOTE : BLE_MODE_GAMEPAD;
+	if (IS_ENABLED(CONFIG_PUCKOFF_BLE_GAMEPAD_ONLY) && mode == BLE_MODE_REMOTE) {
+		shell_error(shell, "this image exposes the gamepad only (PUCKOFF_BLE_GAMEPAD_ONLY)");
+		return -ENOTSUP;
+	}
 	return report_result(shell, ble_bridge_set_mode(mode), "mode");
 }
 

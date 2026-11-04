@@ -179,6 +179,37 @@ Whether a given TV accepts a composite HID device, maps AC Home/AC Back the
 way its own remote does, or shows a pointer for the mouse report has to be
 observed on that TV; none of it is implied by the descriptor.
 
+### macOS: the gamepad-only build
+
+Tested 2026-11-04 on a Mac mini with the composite map: the Mac paired, bonded
+and subscribed, the board delivered every report, and `hidutil` listed all four
+collections, yet no process on the Mac received a value. Giving the Device
+Information service a PnP ID with the USB vendor and product IDs (now on in
+`ble-bridge.conf`) changed nothing. The cause is the keyboard collection: macOS
+treats any HID device that carries one as a protected input device (it even
+opened the Keyboard Setup Assistant for the board), and withholds the whole
+device from processes without Input Monitoring permission, the gamepad report
+included.
+
+`CONFIG_PUCKOFF_BLE_GAMEPAD_ONLY` (stacked with
+`firmware/modes/ble-gamepad-only.conf`) exposes only the gamepad collection: the
+report map ends after Report ID 1, the HID service has one input report, and
+`ble mode remote` is refused. With that image the Mac read the controller's
+reports through plain HID (hidapi, which is also the path Steam Input and
+browsers use). Apple's GameController framework does not list the device, so
+Mac apps that only use that framework (an "MFi" controller in its terms) do not
+see it. A host keeps its cached copy of the old report map: after switching
+builds, forget the board on the host and `ble forget_hosts` on the board, then
+pair again.
+
+Build it as the bridge with the extra conf file stacked:
+
+```sh
+west build -b promicro_nrf52840/nrf52840/uf2 -d build/ble-bridge-gamepad firmware -- \
+  '-DEXTRA_CONF_FILE=ble-bridge.conf;modes/ble-gamepad-only.conf' \
+  -DEXTRA_DTC_OVERLAY_FILE=ble-bridge.overlay
+```
+
 Hardware checklist for a first test: copy a pairing onto the board, confirm
 the controller still works over USB, then pair `PuckOff` from a TV or phone and
 check that buttons, sticks and triggers respond, the link survives 10 minutes

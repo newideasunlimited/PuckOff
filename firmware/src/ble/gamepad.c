@@ -37,6 +37,10 @@ static bool started;
 static int last_tx_error;
 /* Value attributes of the four Report characteristics, found at start. */
 static const struct bt_gatt_attr *report_attr[BLE_REPORT_COUNT];
+/* How many of those the service actually exposes (hid_map.c describes the same). */
+#define EXPOSED_REPORTS (IS_ENABLED(CONFIG_PUCKOFF_BLE_GAMEPAD_ONLY) ? 1 : BLE_REPORT_COUNT)
+#define EXPOSED_MAP_LEN                                                                      \
+	(IS_ENABLED(CONFIG_PUCKOFF_BLE_GAMEPAD_ONLY) ? ble_hid_map_gamepad_len : ble_hid_map_len)
 
 static void report_work_handler(struct k_work *work);
 static void advertise_work_handler(struct k_work *work);
@@ -64,7 +68,7 @@ static ssize_t read_information(struct bt_conn *conn, const struct bt_gatt_attr 
 static ssize_t read_map(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
 			uint16_t len, uint16_t offset)
 {
-	return bt_gatt_attr_read(conn, attr, buf, len, offset, ble_hid_map, ble_hid_map_len);
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, ble_hid_map, EXPOSED_MAP_LEN);
 }
 
 static ssize_t read_report(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
@@ -99,6 +103,7 @@ static void gamepad_ccc(const struct bt_gatt_attr *attr, uint16_t value)
 	subscription_changed(BLE_REPORT_GAMEPAD, value);
 }
 
+#ifndef CONFIG_PUCKOFF_BLE_GAMEPAD_ONLY
 static void keyboard_ccc(const struct bt_gatt_attr *attr, uint16_t value)
 {
 	ARG_UNUSED(attr);
@@ -116,6 +121,7 @@ static void consumer_ccc(const struct bt_gatt_attr *attr, uint16_t value)
 	ARG_UNUSED(attr);
 	subscription_changed(BLE_REPORT_CONSUMER, value);
 }
+#endif
 
 static ssize_t write_control(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 			     const void *buf, uint16_t len, uint16_t offset, uint8_t flags)
@@ -156,9 +162,11 @@ BT_GATT_SERVICE_DEFINE(gamepad_service,
 	BT_GATT_CHARACTERISTIC(BT_UUID_HIDS_REPORT_MAP, BT_GATT_CHRC_READ,
 			       BT_GATT_PERM_READ_ENCRYPT, read_map, NULL, NULL),
 	INPUT_REPORT(BLE_REPORT_GAMEPAD, gamepad_ccc),
+#ifndef CONFIG_PUCKOFF_BLE_GAMEPAD_ONLY
 	INPUT_REPORT(BLE_REPORT_KEYBOARD, keyboard_ccc),
 	INPUT_REPORT(BLE_REPORT_MOUSE, mouse_ccc),
 	INPUT_REPORT(BLE_REPORT_CONSUMER, consumer_ccc),
+#endif
 	BT_GATT_CHARACTERISTIC(BT_UUID_HIDS_CTRL_POINT, BT_GATT_CHRC_WRITE_WITHOUT_RESP,
 			       BT_GATT_PERM_WRITE_ENCRYPT, NULL, write_control, NULL)
 );
@@ -173,18 +181,18 @@ static int find_report_attributes(void)
 		if (bt_uuid_cmp(attr->uuid, BT_UUID_HIDS_REPORT) != 0) {
 			continue;
 		}
-		if (found == BLE_REPORT_COUNT || attr->user_data != &report_ids[found]) {
+		if (found == EXPOSED_REPORTS || attr->user_data != &report_ids[found]) {
 			return -EINVAL;
 		}
 		report_attr[found++] = attr;
 	}
-	return found == BLE_REPORT_COUNT ? 0 : -EINVAL;
+	return found == EXPOSED_REPORTS ? 0 : -EINVAL;
 }
 
 /* Bonded hosts keep their CCC values across reconnects without writing them again. */
 static void resync_subscriptions(void)
 {
-	for (int i = 0; i < BLE_REPORT_COUNT; i++) {
+	for (int i = 0; i < EXPOSED_REPORTS; i++) {
 		bool subscribed = bt_gatt_is_subscribed(host, report_attr[i], BT_GATT_CCC_NOTIFY);
 
 		if (subscribed != state.report[i].subscribed) {

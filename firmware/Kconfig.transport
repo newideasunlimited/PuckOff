@@ -27,3 +27,14 @@ config PUCKOFF_TRANSPORT_BLE_BRIDGE
 	  With no BLE host connected, input goes to the USB gamepad instead.
 
 endchoice
+
+config PUCKOFF_BLE_GAMEPAD_ONLY
+	bool "Expose only the gamepad collection over Bluetooth"
+	depends on PUCKOFF_TRANSPORT_BLE_BRIDGE || PUCKOFF_TRANSPORT_BLE_DIAGNOSTIC
+	help
+	  The report map and the HID service carry the gamepad report only; the
+	  keyboard, mouse and consumer collections used by TV remote mode are
+	  left out and "ble mode remote" is refused. macOS treats a device that
+	  also carries a keyboard collection as a protected input device and
+	  does not hand its gamepad reports to apps. The host sees a different
+	  GATT database, so forget and re-pair the board after changing this.
